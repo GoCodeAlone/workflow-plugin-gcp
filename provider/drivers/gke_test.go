@@ -73,6 +73,83 @@ func TestGKEDriver_Create_Error(t *testing.T) {
 	}
 }
 
+func TestGKEDriver_Update_Success(t *testing.T) {
+	d := &GKEDriver{Client: &mockGKEClient{}, ProjectID: "p", Location: "z"}
+	ref := interfaces.ResourceRef{Name: "cluster", Type: "infra.k8s_cluster", ProviderID: "cluster-123"}
+	spec := interfaces.ResourceSpec{Name: "cluster", Config: map[string]any{"node_count": 5}}
+	out, err := d.Update(context.Background(), ref, spec)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out == nil {
+		t.Fatal("expected output")
+	}
+}
+
+func TestGKEDriver_Update_Error(t *testing.T) {
+	d := &GKEDriver{Client: &mockGKEClient{updateErr: fmt.Errorf("update failed")}, ProjectID: "p", Location: "z"}
+	ref := interfaces.ResourceRef{Name: "cluster", Type: "infra.k8s_cluster", ProviderID: "cluster-123"}
+	spec := interfaces.ResourceSpec{Name: "cluster", Config: map[string]any{}}
+	_, err := d.Update(context.Background(), ref, spec)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestGKEDriver_Delete_Success(t *testing.T) {
+	d := &GKEDriver{Client: &mockGKEClient{}, ProjectID: "p", Location: "z"}
+	ref := interfaces.ResourceRef{Name: "cluster", Type: "infra.k8s_cluster", ProviderID: "cluster-123"}
+	if err := d.Delete(context.Background(), ref); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGKEDriver_Delete_Error(t *testing.T) {
+	d := &GKEDriver{Client: &mockGKEClient{deleteErr: fmt.Errorf("delete failed")}, ProjectID: "p", Location: "z"}
+	ref := interfaces.ResourceRef{Name: "cluster", Type: "infra.k8s_cluster", ProviderID: "cluster-123"}
+	if err := d.Delete(context.Background(), ref); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestGKEDriver_Diff_NoChanges(t *testing.T) {
+	d := &GKEDriver{Client: &mockGKEClient{}, ProjectID: "p", Location: "z"}
+	spec := interfaces.ResourceSpec{Name: "c", Config: map[string]any{"machine_type": "n2-standard-2"}}
+	current := &interfaces.ResourceOutput{Outputs: map[string]any{"machine_type": "n2-standard-2"}}
+	diff, err := d.Diff(context.Background(), spec, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if diff.NeedsUpdate {
+		t.Error("expected no update needed")
+	}
+}
+
+func TestGKEDriver_Diff_HasChanges(t *testing.T) {
+	d := &GKEDriver{Client: &mockGKEClient{}, ProjectID: "p", Location: "z"}
+	spec := interfaces.ResourceSpec{Name: "c", Config: map[string]any{"machine_type": "n2-standard-4"}}
+	current := &interfaces.ResourceOutput{Outputs: map[string]any{"machine_type": "n2-standard-2"}}
+	diff, err := d.Diff(context.Background(), spec, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !diff.NeedsUpdate {
+		t.Error("expected update needed")
+	}
+}
+
+func TestGKEDriver_HealthCheck_Unhealthy(t *testing.T) {
+	d := &GKEDriver{Client: &mockGKEClient{getErr: fmt.Errorf("cluster not found")}, ProjectID: "p", Location: "z"}
+	ref := interfaces.ResourceRef{Name: "cluster", Type: "infra.k8s_cluster", ProviderID: "cluster-123"}
+	hr, err := d.HealthCheck(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hr.Healthy {
+		t.Error("expected unhealthy")
+	}
+}
+
 func TestGKEDriver_Scale(t *testing.T) {
 	d := &GKEDriver{
 		Client:    &mockGKEClient{},

@@ -62,6 +62,71 @@ func TestSSLCertificateDriver_Create_Error(t *testing.T) {
 	}
 }
 
+func TestSSLCertificateDriver_Update_Success(t *testing.T) {
+	d := &SSLCertificateDriver{Client: &mockSSLCertClient{}, ProjectID: "p"}
+	ref := interfaces.ResourceRef{Name: "cert", Type: "infra.certificate", ProviderID: "cert-123"}
+	spec := interfaces.ResourceSpec{Name: "cert", Config: map[string]any{"domains": "new.example.com"}}
+	out, err := d.Update(context.Background(), ref, spec)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out == nil {
+		t.Fatal("expected output")
+	}
+}
+
+func TestSSLCertificateDriver_Update_Error(t *testing.T) {
+	d := &SSLCertificateDriver{Client: &mockSSLCertClient{updateErr: fmt.Errorf("update failed")}, ProjectID: "p"}
+	ref := interfaces.ResourceRef{Name: "cert", Type: "infra.certificate", ProviderID: "cert-123"}
+	spec := interfaces.ResourceSpec{Name: "cert", Config: map[string]any{}}
+	_, err := d.Update(context.Background(), ref, spec)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestSSLCertificateDriver_Delete_Success(t *testing.T) {
+	d := &SSLCertificateDriver{Client: &mockSSLCertClient{}, ProjectID: "p"}
+	ref := interfaces.ResourceRef{Name: "cert", Type: "infra.certificate", ProviderID: "cert-123"}
+	if err := d.Delete(context.Background(), ref); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSSLCertificateDriver_Delete_Error(t *testing.T) {
+	d := &SSLCertificateDriver{Client: &mockSSLCertClient{deleteErr: fmt.Errorf("delete failed")}, ProjectID: "p"}
+	ref := interfaces.ResourceRef{Name: "cert", Type: "infra.certificate", ProviderID: "cert-123"}
+	if err := d.Delete(context.Background(), ref); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestSSLCertificateDriver_Diff_NeedsReplace(t *testing.T) {
+	d := &SSLCertificateDriver{Client: &mockSSLCertClient{}, ProjectID: "p"}
+	spec := interfaces.ResourceSpec{Name: "cert", Config: map[string]any{"domains": "new.example.com"}}
+	current := &interfaces.ResourceOutput{Outputs: map[string]any{"domains": "old.example.com"}}
+	diff, err := d.Diff(context.Background(), spec, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !diff.NeedsReplace {
+		t.Error("expected needs replace for domains change")
+	}
+}
+
+func TestSSLCertificateDriver_Diff_NoChanges(t *testing.T) {
+	d := &SSLCertificateDriver{Client: &mockSSLCertClient{}, ProjectID: "p"}
+	spec := interfaces.ResourceSpec{Name: "cert", Config: map[string]any{"domains": "example.com"}}
+	current := &interfaces.ResourceOutput{Outputs: map[string]any{"domains": "example.com"}}
+	diff, err := d.Diff(context.Background(), spec, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if diff.NeedsUpdate {
+		t.Error("expected no update needed")
+	}
+}
+
 func TestSSLCertificateDriver_HealthCheck(t *testing.T) {
 	d := &SSLCertificateDriver{Client: &mockSSLCertClient{getResult: map[string]any{"status": "ACTIVE"}}, ProjectID: "p"}
 	ref := interfaces.ResourceRef{Name: "cert", Type: "infra.certificate", ProviderID: "cert-123"}
@@ -71,5 +136,17 @@ func TestSSLCertificateDriver_HealthCheck(t *testing.T) {
 	}
 	if !hr.Healthy {
 		t.Error("expected healthy")
+	}
+}
+
+func TestSSLCertificateDriver_HealthCheck_Unhealthy(t *testing.T) {
+	d := &SSLCertificateDriver{Client: &mockSSLCertClient{getErr: fmt.Errorf("cert not found")}, ProjectID: "p"}
+	ref := interfaces.ResourceRef{Name: "cert", Type: "infra.certificate", ProviderID: "cert-123"}
+	hr, err := d.HealthCheck(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hr.Healthy {
+		t.Error("expected unhealthy")
 	}
 }

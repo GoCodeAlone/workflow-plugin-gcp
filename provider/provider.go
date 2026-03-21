@@ -7,6 +7,7 @@ import (
 
 	"github.com/GoCodeAlone/workflow/interfaces"
 	"github.com/GoCodeAlone/workflow-plugin-gcp/provider/drivers"
+	"google.golang.org/api/option"
 )
 
 const (
@@ -32,7 +33,7 @@ func New() *GCPProvider {
 func (p *GCPProvider) Name() string    { return providerName }
 func (p *GCPProvider) Version() string { return providerVersion }
 
-func (p *GCPProvider) Initialize(_ context.Context, config map[string]any) error {
+func (p *GCPProvider) Initialize(ctx context.Context, config map[string]any) error {
 	pid, ok := config["project_id"].(string)
 	if !ok || pid == "" {
 		return fmt.Errorf("gcp: project_id is required")
@@ -49,12 +50,60 @@ func (p *GCPProvider) Initialize(_ context.Context, config map[string]any) error
 		p.zone = z
 	}
 
-	// Register all drivers with nil clients (real clients would be created here
-	// via ADC or credentials_file). The nil-client drivers will fail at call time,
-	// which is the correct behavior when no real GCP credentials are available.
-	// Tests inject mock clients directly.
+	// Build client options for authentication.
+	var opts []option.ClientOption
+	if credFile, ok := config["credentials_file"].(string); ok && credFile != "" {
+		opts = append(opts, option.WithCredentialsFile(credFile))
+	}
+	// If no explicit credentials, the SDK will use Application Default Credentials.
+
+	// Attempt to create real SDK clients. Fall back to nil-client drivers
+	// (which fail at call time) if client creation fails.
 	p.registerDrivers()
+	p.tryWireRealClients(ctx, opts)
 	return nil
+}
+
+func (p *GCPProvider) tryWireRealClients(ctx context.Context, opts []option.ClientOption) {
+	if cr, err := drivers.NewRealCloudRunClient(ctx, p.projectID, p.region, opts...); err == nil {
+		p.drivers["infra.container_service"] = &drivers.CloudRunDriver{Client: cr, ProjectID: p.projectID, Region: p.region}
+	}
+	if gke, err := drivers.NewRealGKEClient(ctx, opts...); err == nil {
+		p.drivers["infra.k8s_cluster"] = &drivers.GKEDriver{Client: gke, ProjectID: p.projectID, Location: p.zone}
+	}
+	if sql, err := drivers.NewRealCloudSQLClient(ctx, opts...); err == nil {
+		p.drivers["infra.database"] = &drivers.CloudSQLDriver{Client: sql, ProjectID: p.projectID, Region: p.region}
+	}
+	if ms, err := drivers.NewRealMemorystoreClient(ctx, opts...); err == nil {
+		p.drivers["infra.cache"] = &drivers.MemorystoreDriver{Client: ms, ProjectID: p.projectID, Region: p.region}
+	}
+	if vpc, err := drivers.NewRealVPCClient(ctx, opts...); err == nil {
+		p.drivers["infra.vpc"] = &drivers.VPCDriver{Client: vpc, ProjectID: p.projectID, Region: p.region}
+	}
+	if lb, err := drivers.NewRealLoadBalancerClient(ctx, opts...); err == nil {
+		p.drivers["infra.load_balancer"] = &drivers.LoadBalancerDriver{Client: lb, ProjectID: p.projectID, Region: p.region}
+	}
+	if d, err := drivers.NewRealDNSClient(ctx, opts...); err == nil {
+		p.drivers["infra.dns"] = &drivers.DNSDriver{Client: d, ProjectID: p.projectID}
+	}
+	if ar, err := drivers.NewRealArtifactRegistryClient(ctx, opts...); err == nil {
+		p.drivers["infra.registry"] = &drivers.ArtifactRegistryDriver{Client: ar, ProjectID: p.projectID, Location: p.region}
+	}
+	if gw, err := drivers.NewRealAPIGatewayClient(ctx, opts...); err == nil {
+		p.drivers["infra.api_gateway"] = &drivers.APIGatewayDriver{Client: gw, ProjectID: p.projectID, Region: p.region}
+	}
+	if fw, err := drivers.NewRealFirewallClient(ctx, opts...); err == nil {
+		p.drivers["infra.firewall"] = &drivers.FirewallDriver{Client: fw, ProjectID: p.projectID}
+	}
+	if i, err := drivers.NewRealIAMClient(ctx, opts...); err == nil {
+		p.drivers["infra.iam_role"] = &drivers.IAMDriver{Client: i, ProjectID: p.projectID}
+	}
+	if gcs, err := drivers.NewRealGCSClient(ctx, opts...); err == nil {
+		p.drivers["infra.storage"] = &drivers.GCSDriver{Client: gcs, ProjectID: p.projectID}
+	}
+	if ssl, err := drivers.NewRealSSLClient(ctx, opts...); err == nil {
+		p.drivers["infra.certificate"] = &drivers.SSLCertificateDriver{Client: ssl, ProjectID: p.projectID}
+	}
 }
 
 func (p *GCPProvider) registerDrivers() {

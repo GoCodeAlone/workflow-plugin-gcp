@@ -55,8 +55,8 @@ func TestGCPProvider_ResolveSizing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if sizing.InstanceType != "db-n1-standard-2" {
-		t.Errorf("expected db-n1-standard-2, got %s", sizing.InstanceType)
+	if sizing.InstanceType != "db-custom-2-8192" {
+		t.Errorf("expected db-custom-2-8192, got %s", sizing.InstanceType)
 	}
 }
 

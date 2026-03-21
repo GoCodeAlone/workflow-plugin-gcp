@@ -30,7 +30,7 @@ var k8sClusterSizing = map[interfaces.Size]sizingEntry{
 var databaseSizing = map[interfaces.Size]sizingEntry{
 	interfaces.SizeXS: {InstanceType: "db-f1-micro", Specs: map[string]any{"tier": "db-f1-micro", "disk_size_gb": 10}},
 	interfaces.SizeS:  {InstanceType: "db-g1-small", Specs: map[string]any{"tier": "db-g1-small", "disk_size_gb": 50}},
-	interfaces.SizeM:  {InstanceType: "db-n1-standard-2", Specs: map[string]any{"tier": "db-n1-standard-2", "disk_size_gb": 100}},
+	interfaces.SizeM:  {InstanceType: "db-custom-2-8192", Specs: map[string]any{"tier": "db-custom-2-8192", "disk_size_gb": 100}},
 	interfaces.SizeL:  {InstanceType: "db-n1-standard-4", Specs: map[string]any{"tier": "db-n1-standard-4", "disk_size_gb": 500}},
 	interfaces.SizeXL: {InstanceType: "db-n1-standard-8", Specs: map[string]any{"tier": "db-n1-standard-8", "disk_size_gb": 1000}},
 }
@@ -43,11 +43,92 @@ var cacheSizing = map[interfaces.Size]sizingEntry{
 	interfaces.SizeXL: {InstanceType: "STANDARD_HA-100", Specs: map[string]any{"tier": "STANDARD_HA", "memory_size_gb": 100}},
 }
 
+var vpcSizing = map[interfaces.Size]sizingEntry{
+	interfaces.SizeXS: {InstanceType: "vpc-auto", Specs: map[string]any{"routing_mode": "REGIONAL"}},
+	interfaces.SizeS:  {InstanceType: "vpc-auto", Specs: map[string]any{"routing_mode": "REGIONAL"}},
+	interfaces.SizeM:  {InstanceType: "vpc-auto", Specs: map[string]any{"routing_mode": "GLOBAL"}},
+	interfaces.SizeL:  {InstanceType: "vpc-auto", Specs: map[string]any{"routing_mode": "GLOBAL"}},
+	interfaces.SizeXL: {InstanceType: "vpc-auto", Specs: map[string]any{"routing_mode": "GLOBAL"}},
+}
+
+var loadBalancerSizing = map[interfaces.Size]sizingEntry{
+	interfaces.SizeXS: {InstanceType: "EXTERNAL", Specs: map[string]any{"scheme": "EXTERNAL"}},
+	interfaces.SizeS:  {InstanceType: "EXTERNAL", Specs: map[string]any{"scheme": "EXTERNAL"}},
+	interfaces.SizeM:  {InstanceType: "EXTERNAL_MANAGED", Specs: map[string]any{"scheme": "EXTERNAL_MANAGED"}},
+	interfaces.SizeL:  {InstanceType: "EXTERNAL_MANAGED", Specs: map[string]any{"scheme": "EXTERNAL_MANAGED"}},
+	interfaces.SizeXL: {InstanceType: "EXTERNAL_MANAGED", Specs: map[string]any{"scheme": "EXTERNAL_MANAGED", "enable_cdn": true}},
+}
+
+var dnsSizing = map[interfaces.Size]sizingEntry{
+	interfaces.SizeXS: {InstanceType: "public", Specs: map[string]any{"visibility": "public"}},
+	interfaces.SizeS:  {InstanceType: "public", Specs: map[string]any{"visibility": "public"}},
+	interfaces.SizeM:  {InstanceType: "public", Specs: map[string]any{"visibility": "public"}},
+	interfaces.SizeL:  {InstanceType: "private", Specs: map[string]any{"visibility": "private"}},
+	interfaces.SizeXL: {InstanceType: "private", Specs: map[string]any{"visibility": "private"}},
+}
+
+var registrySizing = map[interfaces.Size]sizingEntry{
+	interfaces.SizeXS: {InstanceType: "DOCKER", Specs: map[string]any{"format": "DOCKER"}},
+	interfaces.SizeS:  {InstanceType: "DOCKER", Specs: map[string]any{"format": "DOCKER"}},
+	interfaces.SizeM:  {InstanceType: "DOCKER", Specs: map[string]any{"format": "DOCKER"}},
+	interfaces.SizeL:  {InstanceType: "DOCKER", Specs: map[string]any{"format": "DOCKER", "immutable_tags": true}},
+	interfaces.SizeXL: {InstanceType: "DOCKER", Specs: map[string]any{"format": "DOCKER", "immutable_tags": true}},
+}
+
+var apiGatewaySizing = map[interfaces.Size]sizingEntry{
+	interfaces.SizeXS: {InstanceType: "gateway", Specs: map[string]any{}},
+	interfaces.SizeS:  {InstanceType: "gateway", Specs: map[string]any{}},
+	interfaces.SizeM:  {InstanceType: "gateway", Specs: map[string]any{}},
+	interfaces.SizeL:  {InstanceType: "gateway", Specs: map[string]any{}},
+	interfaces.SizeXL: {InstanceType: "gateway", Specs: map[string]any{}},
+}
+
+var firewallSizing = map[interfaces.Size]sizingEntry{
+	interfaces.SizeXS: {InstanceType: "firewall-rule", Specs: map[string]any{}},
+	interfaces.SizeS:  {InstanceType: "firewall-rule", Specs: map[string]any{}},
+	interfaces.SizeM:  {InstanceType: "firewall-rule", Specs: map[string]any{}},
+	interfaces.SizeL:  {InstanceType: "firewall-rule", Specs: map[string]any{}},
+	interfaces.SizeXL: {InstanceType: "firewall-rule", Specs: map[string]any{}},
+}
+
+var iamRoleSizing = map[interfaces.Size]sizingEntry{
+	interfaces.SizeXS: {InstanceType: "custom-role", Specs: map[string]any{}},
+	interfaces.SizeS:  {InstanceType: "custom-role", Specs: map[string]any{}},
+	interfaces.SizeM:  {InstanceType: "custom-role", Specs: map[string]any{}},
+	interfaces.SizeL:  {InstanceType: "custom-role", Specs: map[string]any{}},
+	interfaces.SizeXL: {InstanceType: "custom-role", Specs: map[string]any{}},
+}
+
+var storageSizing = map[interfaces.Size]sizingEntry{
+	interfaces.SizeXS: {InstanceType: "STANDARD", Specs: map[string]any{"storage_class": "STANDARD"}},
+	interfaces.SizeS:  {InstanceType: "STANDARD", Specs: map[string]any{"storage_class": "STANDARD"}},
+	interfaces.SizeM:  {InstanceType: "NEARLINE", Specs: map[string]any{"storage_class": "NEARLINE"}},
+	interfaces.SizeL:  {InstanceType: "COLDLINE", Specs: map[string]any{"storage_class": "COLDLINE"}},
+	interfaces.SizeXL: {InstanceType: "ARCHIVE", Specs: map[string]any{"storage_class": "ARCHIVE"}},
+}
+
+var certificateSizing = map[interfaces.Size]sizingEntry{
+	interfaces.SizeXS: {InstanceType: "managed-ssl", Specs: map[string]any{"type": "MANAGED"}},
+	interfaces.SizeS:  {InstanceType: "managed-ssl", Specs: map[string]any{"type": "MANAGED"}},
+	interfaces.SizeM:  {InstanceType: "managed-ssl", Specs: map[string]any{"type": "MANAGED"}},
+	interfaces.SizeL:  {InstanceType: "managed-ssl", Specs: map[string]any{"type": "MANAGED"}},
+	interfaces.SizeXL: {InstanceType: "managed-ssl", Specs: map[string]any{"type": "MANAGED"}},
+}
+
 var sizingTables = map[string]map[interfaces.Size]sizingEntry{
 	"infra.container_service": containerServiceSizing,
 	"infra.k8s_cluster":       k8sClusterSizing,
 	"infra.database":          databaseSizing,
 	"infra.cache":             cacheSizing,
+	"infra.vpc":               vpcSizing,
+	"infra.load_balancer":     loadBalancerSizing,
+	"infra.dns":               dnsSizing,
+	"infra.registry":          registrySizing,
+	"infra.api_gateway":       apiGatewaySizing,
+	"infra.firewall":          firewallSizing,
+	"infra.iam_role":          iamRoleSizing,
+	"infra.storage":           storageSizing,
+	"infra.certificate":       certificateSizing,
 }
 
 func resolveSizing(resourceType string, size interfaces.Size, hints *interfaces.ResourceHints) (*interfaces.ProviderSizing, error) {

@@ -73,6 +73,71 @@ func TestMemorystoreDriver_Create_Error(t *testing.T) {
 	}
 }
 
+func TestMemorystoreDriver_Update_Success(t *testing.T) {
+	d := &MemorystoreDriver{Client: &mockMemorystoreClient{}, ProjectID: "p", Region: "r"}
+	ref := interfaces.ResourceRef{Name: "cache", Type: "infra.cache", ProviderID: "redis-1"}
+	spec := interfaces.ResourceSpec{Name: "cache", Config: map[string]any{"memory_size_gb": 10}}
+	out, err := d.Update(context.Background(), ref, spec)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out == nil {
+		t.Fatal("expected output")
+	}
+}
+
+func TestMemorystoreDriver_Update_Error(t *testing.T) {
+	d := &MemorystoreDriver{Client: &mockMemorystoreClient{updateErr: fmt.Errorf("update failed")}, ProjectID: "p", Region: "r"}
+	ref := interfaces.ResourceRef{Name: "cache", Type: "infra.cache", ProviderID: "redis-1"}
+	spec := interfaces.ResourceSpec{Name: "cache", Config: map[string]any{}}
+	_, err := d.Update(context.Background(), ref, spec)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestMemorystoreDriver_Delete_Success(t *testing.T) {
+	d := &MemorystoreDriver{Client: &mockMemorystoreClient{}, ProjectID: "p", Region: "r"}
+	ref := interfaces.ResourceRef{Name: "cache", Type: "infra.cache", ProviderID: "redis-1"}
+	if err := d.Delete(context.Background(), ref); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestMemorystoreDriver_Delete_Error(t *testing.T) {
+	d := &MemorystoreDriver{Client: &mockMemorystoreClient{deleteErr: fmt.Errorf("delete failed")}, ProjectID: "p", Region: "r"}
+	ref := interfaces.ResourceRef{Name: "cache", Type: "infra.cache", ProviderID: "redis-1"}
+	if err := d.Delete(context.Background(), ref); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestMemorystoreDriver_Diff_HasChanges(t *testing.T) {
+	d := &MemorystoreDriver{Client: &mockMemorystoreClient{}, ProjectID: "p", Region: "r"}
+	spec := interfaces.ResourceSpec{Name: "cache", Config: map[string]any{"memory_size_gb": 10}}
+	current := &interfaces.ResourceOutput{Outputs: map[string]any{"memory_size_gb": 5}}
+	diff, err := d.Diff(context.Background(), spec, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !diff.NeedsUpdate {
+		t.Error("expected update needed")
+	}
+}
+
+func TestMemorystoreDriver_Diff_NoChanges(t *testing.T) {
+	d := &MemorystoreDriver{Client: &mockMemorystoreClient{}, ProjectID: "p", Region: "r"}
+	spec := interfaces.ResourceSpec{Name: "cache", Config: map[string]any{"memory_size_gb": 5}}
+	current := &interfaces.ResourceOutput{Outputs: map[string]any{"memory_size_gb": 5}}
+	diff, err := d.Diff(context.Background(), spec, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if diff.NeedsUpdate {
+		t.Error("expected no update needed")
+	}
+}
+
 func TestMemorystoreDriver_HealthCheck(t *testing.T) {
 	d := &MemorystoreDriver{
 		Client:    &mockMemorystoreClient{getResult: map[string]any{"status": "READY"}},
@@ -86,5 +151,17 @@ func TestMemorystoreDriver_HealthCheck(t *testing.T) {
 	}
 	if !hr.Healthy {
 		t.Error("expected healthy")
+	}
+}
+
+func TestMemorystoreDriver_HealthCheck_Unhealthy(t *testing.T) {
+	d := &MemorystoreDriver{Client: &mockMemorystoreClient{getErr: fmt.Errorf("instance not found")}, ProjectID: "p", Region: "r"}
+	ref := interfaces.ResourceRef{Name: "cache", Type: "infra.cache", ProviderID: "redis-1"}
+	hr, err := d.HealthCheck(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hr.Healthy {
+		t.Error("expected unhealthy")
 	}
 }

@@ -61,3 +61,92 @@ func TestDNSDriver_Create_Error(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestDNSDriver_Update_Success(t *testing.T) {
+	d := &DNSDriver{Client: &mockDNSClient{}, ProjectID: "p"}
+	ref := interfaces.ResourceRef{Name: "zone", Type: "infra.dns", ProviderID: "zone-123"}
+	spec := interfaces.ResourceSpec{Name: "zone", Config: map[string]any{"description": "updated"}}
+	out, err := d.Update(context.Background(), ref, spec)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out == nil {
+		t.Fatal("expected output")
+	}
+}
+
+func TestDNSDriver_Update_Error(t *testing.T) {
+	d := &DNSDriver{Client: &mockDNSClient{updateErr: fmt.Errorf("update failed")}, ProjectID: "p"}
+	ref := interfaces.ResourceRef{Name: "zone", Type: "infra.dns", ProviderID: "zone-123"}
+	spec := interfaces.ResourceSpec{Name: "zone", Config: map[string]any{}}
+	_, err := d.Update(context.Background(), ref, spec)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestDNSDriver_Delete_Success(t *testing.T) {
+	d := &DNSDriver{Client: &mockDNSClient{}, ProjectID: "p"}
+	ref := interfaces.ResourceRef{Name: "zone", Type: "infra.dns", ProviderID: "zone-123"}
+	if err := d.Delete(context.Background(), ref); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDNSDriver_Delete_Error(t *testing.T) {
+	d := &DNSDriver{Client: &mockDNSClient{deleteErr: fmt.Errorf("delete failed")}, ProjectID: "p"}
+	ref := interfaces.ResourceRef{Name: "zone", Type: "infra.dns", ProviderID: "zone-123"}
+	if err := d.Delete(context.Background(), ref); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestDNSDriver_Diff_HasChanges(t *testing.T) {
+	d := &DNSDriver{Client: &mockDNSClient{}, ProjectID: "p"}
+	spec := interfaces.ResourceSpec{Name: "zone", Config: map[string]any{"dns_name": "new.example.com."}}
+	current := &interfaces.ResourceOutput{Outputs: map[string]any{"dns_name": "old.example.com."}}
+	diff, err := d.Diff(context.Background(), spec, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !diff.NeedsUpdate {
+		t.Error("expected update needed")
+	}
+}
+
+func TestDNSDriver_Diff_NoChanges(t *testing.T) {
+	d := &DNSDriver{Client: &mockDNSClient{}, ProjectID: "p"}
+	spec := interfaces.ResourceSpec{Name: "zone", Config: map[string]any{"dns_name": "example.com."}}
+	current := &interfaces.ResourceOutput{Outputs: map[string]any{"dns_name": "example.com."}}
+	diff, err := d.Diff(context.Background(), spec, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if diff.NeedsUpdate {
+		t.Error("expected no update needed")
+	}
+}
+
+func TestDNSDriver_HealthCheck_Healthy(t *testing.T) {
+	d := &DNSDriver{Client: &mockDNSClient{}, ProjectID: "p"}
+	ref := interfaces.ResourceRef{Name: "zone", Type: "infra.dns", ProviderID: "zone-123"}
+	hr, err := d.HealthCheck(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hr.Healthy {
+		t.Error("expected healthy")
+	}
+}
+
+func TestDNSDriver_HealthCheck_Unhealthy(t *testing.T) {
+	d := &DNSDriver{Client: &mockDNSClient{getErr: fmt.Errorf("zone not found")}, ProjectID: "p"}
+	ref := interfaces.ResourceRef{Name: "zone", Type: "infra.dns", ProviderID: "zone-123"}
+	hr, err := d.HealthCheck(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hr.Healthy {
+		t.Error("expected unhealthy")
+	}
+}

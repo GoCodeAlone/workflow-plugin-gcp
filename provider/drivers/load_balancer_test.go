@@ -61,3 +61,92 @@ func TestLoadBalancerDriver_Create_Error(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestLoadBalancerDriver_Update_Success(t *testing.T) {
+	d := &LoadBalancerDriver{Client: &mockLBClient{}, ProjectID: "p", Region: "r"}
+	ref := interfaces.ResourceRef{Name: "lb", Type: "infra.load_balancer", ProviderID: "lb-123"}
+	spec := interfaces.ResourceSpec{Name: "lb", Config: map[string]any{"target": "new-target"}}
+	out, err := d.Update(context.Background(), ref, spec)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out == nil {
+		t.Fatal("expected output")
+	}
+}
+
+func TestLoadBalancerDriver_Update_Error(t *testing.T) {
+	d := &LoadBalancerDriver{Client: &mockLBClient{updateErr: fmt.Errorf("update failed")}, ProjectID: "p", Region: "r"}
+	ref := interfaces.ResourceRef{Name: "lb", Type: "infra.load_balancer", ProviderID: "lb-123"}
+	spec := interfaces.ResourceSpec{Name: "lb", Config: map[string]any{}}
+	_, err := d.Update(context.Background(), ref, spec)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestLoadBalancerDriver_Delete_Success(t *testing.T) {
+	d := &LoadBalancerDriver{Client: &mockLBClient{}, ProjectID: "p", Region: "r"}
+	ref := interfaces.ResourceRef{Name: "lb", Type: "infra.load_balancer", ProviderID: "lb-123"}
+	if err := d.Delete(context.Background(), ref); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadBalancerDriver_Delete_Error(t *testing.T) {
+	d := &LoadBalancerDriver{Client: &mockLBClient{deleteErr: fmt.Errorf("delete failed")}, ProjectID: "p", Region: "r"}
+	ref := interfaces.ResourceRef{Name: "lb", Type: "infra.load_balancer", ProviderID: "lb-123"}
+	if err := d.Delete(context.Background(), ref); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestLoadBalancerDriver_Diff_HasChanges(t *testing.T) {
+	d := &LoadBalancerDriver{Client: &mockLBClient{}, ProjectID: "p", Region: "r"}
+	spec := interfaces.ResourceSpec{Name: "lb", Config: map[string]any{"target": "new-target"}}
+	current := &interfaces.ResourceOutput{Outputs: map[string]any{"target": "old-target"}}
+	diff, err := d.Diff(context.Background(), spec, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !diff.NeedsUpdate {
+		t.Error("expected update needed")
+	}
+}
+
+func TestLoadBalancerDriver_Diff_NoChanges(t *testing.T) {
+	d := &LoadBalancerDriver{Client: &mockLBClient{}, ProjectID: "p", Region: "r"}
+	spec := interfaces.ResourceSpec{Name: "lb", Config: map[string]any{"target": "same"}}
+	current := &interfaces.ResourceOutput{Outputs: map[string]any{"target": "same"}}
+	diff, err := d.Diff(context.Background(), spec, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if diff.NeedsUpdate {
+		t.Error("expected no update needed")
+	}
+}
+
+func TestLoadBalancerDriver_HealthCheck_Healthy(t *testing.T) {
+	d := &LoadBalancerDriver{Client: &mockLBClient{}, ProjectID: "p", Region: "r"}
+	ref := interfaces.ResourceRef{Name: "lb", Type: "infra.load_balancer", ProviderID: "lb-123"}
+	hr, err := d.HealthCheck(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hr.Healthy {
+		t.Error("expected healthy")
+	}
+}
+
+func TestLoadBalancerDriver_HealthCheck_Unhealthy(t *testing.T) {
+	d := &LoadBalancerDriver{Client: &mockLBClient{getErr: fmt.Errorf("not found")}, ProjectID: "p", Region: "r"}
+	ref := interfaces.ResourceRef{Name: "lb", Type: "infra.load_balancer", ProviderID: "lb-123"}
+	hr, err := d.HealthCheck(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hr.Healthy {
+		t.Error("expected unhealthy")
+	}
+}

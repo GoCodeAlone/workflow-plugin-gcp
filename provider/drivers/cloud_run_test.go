@@ -97,6 +97,90 @@ func TestCloudRunDriver_HealthCheck(t *testing.T) {
 	}
 }
 
+func TestCloudRunDriver_Update_Success(t *testing.T) {
+	d := &CloudRunDriver{Client: &mockCloudRunClient{}, ProjectID: "test-project", Region: "us-central1"}
+	ref := interfaces.ResourceRef{Name: "svc", Type: "infra.container_service", ProviderID: "svc-123"}
+	spec := interfaces.ResourceSpec{Name: "svc", Type: "infra.container_service", Config: map[string]any{"image": "new:latest"}}
+	out, err := d.Update(context.Background(), ref, spec)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out == nil {
+		t.Fatal("expected output")
+	}
+}
+
+func TestCloudRunDriver_Update_Error(t *testing.T) {
+	d := &CloudRunDriver{Client: &mockCloudRunClient{updateErr: fmt.Errorf("update failed")}, ProjectID: "p", Region: "r"}
+	ref := interfaces.ResourceRef{Name: "svc", Type: "infra.container_service", ProviderID: "svc-123"}
+	spec := interfaces.ResourceSpec{Name: "svc", Type: "infra.container_service", Config: map[string]any{}}
+	_, err := d.Update(context.Background(), ref, spec)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestCloudRunDriver_Delete_Success(t *testing.T) {
+	d := &CloudRunDriver{Client: &mockCloudRunClient{}, ProjectID: "test-project", Region: "us-central1"}
+	ref := interfaces.ResourceRef{Name: "svc", Type: "infra.container_service", ProviderID: "svc-123"}
+	if err := d.Delete(context.Background(), ref); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCloudRunDriver_Delete_Error(t *testing.T) {
+	d := &CloudRunDriver{Client: &mockCloudRunClient{deleteErr: fmt.Errorf("delete failed")}, ProjectID: "p", Region: "r"}
+	ref := interfaces.ResourceRef{Name: "svc", Type: "infra.container_service", ProviderID: "svc-123"}
+	if err := d.Delete(context.Background(), ref); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestCloudRunDriver_Diff_NoChanges(t *testing.T) {
+	d := &CloudRunDriver{Client: &mockCloudRunClient{}, ProjectID: "p", Region: "r"}
+	spec := interfaces.ResourceSpec{Name: "svc", Config: map[string]any{"image": "app:v1"}}
+	current := &interfaces.ResourceOutput{Outputs: map[string]any{"image": "app:v1"}}
+	diff, err := d.Diff(context.Background(), spec, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if diff.NeedsUpdate {
+		t.Error("expected no update needed")
+	}
+}
+
+func TestCloudRunDriver_Diff_HasChanges(t *testing.T) {
+	d := &CloudRunDriver{Client: &mockCloudRunClient{}, ProjectID: "p", Region: "r"}
+	spec := interfaces.ResourceSpec{Name: "svc", Config: map[string]any{"image": "app:v2"}}
+	current := &interfaces.ResourceOutput{Outputs: map[string]any{"image": "app:v1"}}
+	diff, err := d.Diff(context.Background(), spec, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !diff.NeedsUpdate {
+		t.Error("expected update needed")
+	}
+	if len(diff.Changes) != 1 {
+		t.Errorf("expected 1 change, got %d", len(diff.Changes))
+	}
+}
+
+func TestCloudRunDriver_HealthCheck_Unhealthy(t *testing.T) {
+	d := &CloudRunDriver{
+		Client:    &mockCloudRunClient{getErr: fmt.Errorf("service unavailable")},
+		ProjectID: "test-project",
+		Region:    "us-central1",
+	}
+	ref := interfaces.ResourceRef{Name: "svc", Type: "infra.container_service", ProviderID: "svc-123"}
+	hr, err := d.HealthCheck(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hr.Healthy {
+		t.Error("expected unhealthy")
+	}
+}
+
 func TestCloudRunDriver_Scale(t *testing.T) {
 	d := &CloudRunDriver{
 		Client:    &mockCloudRunClient{},

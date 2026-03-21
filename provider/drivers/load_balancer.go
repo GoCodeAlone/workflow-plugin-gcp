@@ -27,7 +27,7 @@ func (d *LoadBalancerDriver) Create(ctx context.Context, spec interfaces.Resourc
 		Outputs: map[string]any{
 			"lb_id":  id,
 			"region": d.Region,
-			"ip":     fmt.Sprintf("34.%s.0.1", spec.Name),
+			"ip":     "", // IP assigned after provisioning
 		},
 	}, nil
 }
