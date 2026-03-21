@@ -1,0 +1,23 @@
+{
+  "name": "workflow-plugin-gcp",
+  "version": "0.1.0",
+  "author": "GoCodeAlone",
+  "description": "GCP infrastructure provider plugin for workflow",
+  "type": "iac_provider",
+  "provider": "gcp",
+  "resources": [
+    "infra.container_service",
+    "infra.k8s_cluster",
+    "infra.database",
+    "infra.cache",
+    "infra.vpc",
+    "infra.load_balancer",
+    "infra.dns",
+    "infra.registry",
+    "infra.api_gateway",
+    "infra.firewall",
+    "infra.iam_role",
+    "infra.storage",
+    "infra.certificate"
+  ]
+}

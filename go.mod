@@ -1,0 +1,21 @@
+module github.com/GoCodeAlone/workflow-plugin-gcp
+
+go 1.26.0
+
+require github.com/GoCodeAlone/workflow v0.0.0
+
+require (
+	github.com/BurntSushi/toml v1.6.0 // indirect
+	github.com/GoCodeAlone/modular v1.12.3 // indirect
+	github.com/cloudevents/sdk-go/v2 v2.16.2 // indirect
+	github.com/golobby/cast v1.3.3 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/json-iterator/go v1.1.13-0.20220915233716-71ac16282d12 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+)
+
+replace github.com/GoCodeAlone/workflow => /Users/jon/workspace/workflow
