@@ -86,8 +86,8 @@ func TestGCPProvider_NameVersion(t *testing.T) {
 	if p.Name() != "gcp" {
 		t.Errorf("expected gcp, got %s", p.Name())
 	}
-	if p.Version() != "0.1.0" {
-		t.Errorf("expected 0.1.0, got %s", p.Version())
+	if p.Version() == "" {
+		t.Errorf("expected non-empty Version, got empty — build-time ldflags injection missing")
 	}
 }
 

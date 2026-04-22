@@ -10,10 +10,11 @@ import (
 	"google.golang.org/api/option"
 )
 
-const (
-	providerName    = "gcp"
-	providerVersion = "0.1.0"
-)
+const providerName = "gcp"
+
+// ProviderVersion is set at build time via -ldflags
+// "-X github.com/GoCodeAlone/workflow-plugin-gcp/provider.ProviderVersion=X.Y.Z".
+var ProviderVersion = "dev"
 
 // GCPProvider implements interfaces.IaCProvider for Google Cloud Platform.
 type GCPProvider struct {
@@ -31,7 +32,7 @@ func New() *GCPProvider {
 }
 
 func (p *GCPProvider) Name() string    { return providerName }
-func (p *GCPProvider) Version() string { return providerVersion }
+func (p *GCPProvider) Version() string { return ProviderVersion }
 
 func (p *GCPProvider) Initialize(ctx context.Context, config map[string]any) error {
 	pid, ok := config["project_id"].(string)
