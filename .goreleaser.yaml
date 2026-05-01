@@ -4,7 +4,7 @@ project_name: workflow-plugin-gcp
 before:
   hooks:
     - go mod tidy
-    - bash -c "sed -i.bak 's/\"version\": \"[^\"]*\"/\"version\": \"{{ .Version }}\"/' plugin.json && sed -i.bak 's|download/v[0-9][^/]*/|download/v{{ .Version }}/|g' plugin.json && sed -i.bak 's|workflow-plugin-gcp_[0-9][^_]*_|workflow-plugin-gcp_{{ .Version }}_|g' plugin.json && rm -f plugin.json.bak"
+    - bash scripts/update-plugin-version.sh {{ .Version }}
 
 builds:
   - id: plugin
