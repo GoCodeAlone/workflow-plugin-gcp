@@ -3,21 +3,17 @@
   "version": "0.1.0",
   "author": "GoCodeAlone",
   "description": "GCP infrastructure provider plugin for workflow",
-  "type": "iac_provider",
-  "provider": "gcp",
-  "resources": [
-    "infra.container_service",
-    "infra.k8s_cluster",
-    "infra.database",
-    "infra.cache",
-    "infra.vpc",
-    "infra.load_balancer",
-    "infra.dns",
-    "infra.registry",
-    "infra.api_gateway",
-    "infra.firewall",
-    "infra.iam_role",
-    "infra.storage",
-    "infra.certificate"
-  ]
+  "type": "external",
+  "tier": "community",
+  "license": "MIT",
+  "minEngineVersion": "0.3.56",
+  "repository": "https://github.com/GoCodeAlone/workflow-plugin-gcp",
+  "keywords": ["gcp", "google-cloud", "iac", "provider", "infrastructure"],
+  "capabilities": {
+    "configProvider": false,
+    "moduleTypes": [],
+    "stepTypes": [],
+    "triggerTypes": [],
+    "workflowHandlers": []
+  }
 }
