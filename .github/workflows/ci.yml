@@ -23,8 +23,4 @@ jobs:
       - name: Check plugin.json exists
         run: test -f plugin.json || (echo "::error::plugin.json is missing" && exit 1)
       - name: Validate plugin manifest
-        # Validates manifest fields (name, version, author, description, type, tier,
-        # license, downloads) using wfctl plugin validate.
-        # Note: --strict-contracts is available in future wfctl versions; this step
-        # uses the current engine version pinned in go.mod.
-        run: go run github.com/GoCodeAlone/workflow/cmd/wfctl@v0.3.56 plugin validate --file plugin.json
+        run: go run github.com/GoCodeAlone/workflow/cmd/wfctl@v0.20.1 plugin validate --file plugin.json --strict-contracts
