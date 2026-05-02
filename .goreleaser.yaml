@@ -4,7 +4,7 @@ project_name: workflow-plugin-gcp
 before:
   hooks:
     - go mod tidy
-    - "sed -i.bak 's/\"version\": \".*\"/\"version\": \"{{ .Version }}\"/' plugin.json && rm -f plugin.json.bak"
+    - bash scripts/update-plugin-version.sh {{ .Version }}
 
 builds:
   - id: plugin
