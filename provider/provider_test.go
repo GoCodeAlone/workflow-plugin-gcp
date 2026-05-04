@@ -143,3 +143,32 @@ func (m *mockDriver) Scale(_ context.Context, _ interfaces.ResourceRef, _ int) (
 	return nil, nil
 }
 func (m *mockDriver) SensitiveKeys() []string { return nil }
+
+func TestGCPProvider_BootstrapStateBackend_NoOp(t *testing.T) {
+	p := New()
+	res, err := p.BootstrapStateBackend(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res != nil {
+		t.Errorf("expected nil result, got %+v", res)
+	}
+}
+
+func TestGCPProvider_SupportedCanonicalKeys_FullSet(t *testing.T) {
+	p := New()
+	got := p.SupportedCanonicalKeys()
+	want := interfaces.CanonicalKeys()
+	if len(got) != len(want) {
+		t.Fatalf("expected %d keys, got %d", len(want), len(got))
+	}
+	gotSet := make(map[string]bool, len(got))
+	for _, k := range got {
+		gotSet[k] = true
+	}
+	for _, k := range want {
+		if !gotSet[k] {
+			t.Errorf("missing canonical key: %s", k)
+		}
+	}
+}
