@@ -87,3 +87,6 @@ func (d *ArtifactRegistryDriver) HealthCheck(ctx context.Context, ref interfaces
 func (d *ArtifactRegistryDriver) Scale(_ context.Context, _ interfaces.ResourceRef, _ int) (*interfaces.ResourceOutput, error) {
 	return nil, fmt.Errorf("scale not supported for artifact registry")
 }
+
+// SensitiveKeys returns output keys whose values should be masked in logs and plan output.
+func (d *ArtifactRegistryDriver) SensitiveKeys() []string { return nil }

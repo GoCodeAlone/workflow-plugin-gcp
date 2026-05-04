@@ -88,3 +88,6 @@ func (d *LoadBalancerDriver) HealthCheck(ctx context.Context, ref interfaces.Res
 func (d *LoadBalancerDriver) Scale(_ context.Context, _ interfaces.ResourceRef, _ int) (*interfaces.ResourceOutput, error) {
 	return nil, fmt.Errorf("scale not supported for load balancer")
 }
+
+// SensitiveKeys returns output keys whose values should be masked in logs and plan output.
+func (d *LoadBalancerDriver) SensitiveKeys() []string { return nil }

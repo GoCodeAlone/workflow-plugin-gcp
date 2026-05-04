@@ -142,3 +142,4 @@ func (m *mockDriver) HealthCheck(_ context.Context, _ interfaces.ResourceRef) (*
 func (m *mockDriver) Scale(_ context.Context, _ interfaces.ResourceRef, _ int) (*interfaces.ResourceOutput, error) {
 	return nil, nil
 }
+func (m *mockDriver) SensitiveKeys() []string { return nil }

@@ -88,3 +88,6 @@ func (d *APIGatewayDriver) HealthCheck(ctx context.Context, ref interfaces.Resou
 func (d *APIGatewayDriver) Scale(_ context.Context, _ interfaces.ResourceRef, _ int) (*interfaces.ResourceOutput, error) {
 	return nil, fmt.Errorf("scale not supported for api gateway")
 }
+
+// SensitiveKeys returns output keys whose values should be masked in logs and plan output.
+func (d *APIGatewayDriver) SensitiveKeys() []string { return nil }

@@ -103,3 +103,6 @@ func copyConfig(src map[string]any) map[string]any {
 	}
 	return dst
 }
+
+// SensitiveKeys returns output keys whose values should be masked in logs and plan output.
+func (d *CloudSQLDriver) SensitiveKeys() []string { return nil }

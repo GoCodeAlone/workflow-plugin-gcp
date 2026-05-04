@@ -87,3 +87,6 @@ func (d *GCSDriver) HealthCheck(ctx context.Context, ref interfaces.ResourceRef)
 func (d *GCSDriver) Scale(_ context.Context, _ interfaces.ResourceRef, _ int) (*interfaces.ResourceOutput, error) {
 	return nil, fmt.Errorf("scale not supported for cloud storage")
 }
+
+// SensitiveKeys returns output keys whose values should be masked in logs and plan output.
+func (d *GCSDriver) SensitiveKeys() []string { return nil }

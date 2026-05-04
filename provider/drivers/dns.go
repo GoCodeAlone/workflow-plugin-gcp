@@ -82,3 +82,6 @@ func (d *DNSDriver) HealthCheck(ctx context.Context, ref interfaces.ResourceRef)
 func (d *DNSDriver) Scale(_ context.Context, _ interfaces.ResourceRef, _ int) (*interfaces.ResourceOutput, error) {
 	return nil, fmt.Errorf("scale not supported for dns")
 }
+
+// SensitiveKeys returns output keys whose values should be masked in logs and plan output.
+func (d *DNSDriver) SensitiveKeys() []string { return nil }
