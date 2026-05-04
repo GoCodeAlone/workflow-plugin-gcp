@@ -82,3 +82,6 @@ func (d *FirewallDriver) HealthCheck(ctx context.Context, ref interfaces.Resourc
 func (d *FirewallDriver) Scale(_ context.Context, _ interfaces.ResourceRef, _ int) (*interfaces.ResourceOutput, error) {
 	return nil, fmt.Errorf("scale not supported for firewall rules")
 }
+
+// SensitiveKeys returns output keys whose values should be masked in logs and plan output.
+func (d *FirewallDriver) SensitiveKeys() []string { return nil }

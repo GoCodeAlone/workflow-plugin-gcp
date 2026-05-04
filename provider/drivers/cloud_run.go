@@ -94,3 +94,6 @@ func (d *CloudRunDriver) Scale(ctx context.Context, ref interfaces.ResourceRef, 
 	}
 	return d.Read(ctx, ref)
 }
+
+// SensitiveKeys returns output keys whose values should be masked in logs and plan output.
+func (d *CloudRunDriver) SensitiveKeys() []string { return nil }

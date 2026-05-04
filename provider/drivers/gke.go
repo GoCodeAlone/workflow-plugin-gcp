@@ -94,3 +94,6 @@ func (d *GKEDriver) Scale(ctx context.Context, ref interfaces.ResourceRef, repli
 	}
 	return d.Read(ctx, ref)
 }
+
+// SensitiveKeys returns output keys whose values should be masked in logs and plan output.
+func (d *GKEDriver) SensitiveKeys() []string { return nil }

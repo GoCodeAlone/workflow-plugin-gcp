@@ -91,3 +91,6 @@ func (d *MemorystoreDriver) HealthCheck(ctx context.Context, ref interfaces.Reso
 func (d *MemorystoreDriver) Scale(_ context.Context, _ interfaces.ResourceRef, _ int) (*interfaces.ResourceOutput, error) {
 	return nil, fmt.Errorf("scale not supported for memorystore; update memory_size_gb via config instead")
 }
+
+// SensitiveKeys returns output keys whose values should be masked in logs and plan output.
+func (d *MemorystoreDriver) SensitiveKeys() []string { return nil }
