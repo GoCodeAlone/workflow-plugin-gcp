@@ -31,6 +31,15 @@ func New() *GCPProvider {
 	}
 }
 
+// NewGCPProviderConcrete returns a new *GCPProvider for use by the typed-IaC
+// server layer. Unlike New(), this is an explicit concrete type constructor
+// that avoids fragile interface type-assertions in NewIaCServer().
+func NewGCPProviderConcrete() *GCPProvider {
+	return &GCPProvider{
+		drivers: make(map[string]interfaces.ResourceDriver),
+	}
+}
+
 func (p *GCPProvider) Name() string    { return providerName }
 func (p *GCPProvider) Version() string { return ProviderVersion }
 
