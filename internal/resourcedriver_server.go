@@ -11,6 +11,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"math"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -129,7 +130,13 @@ func (s *gcpIaCServer) Scale(ctx context.Context, req *pb.ResourceScaleRequest) 
 	if err != nil {
 		return nil, err
 	}
-	out, err := driver.Scale(ctx, refFromPB(req.GetRef()), int(req.GetReplicas()))
+	replicas := req.GetReplicas()
+	if replicas < 0 || replicas > math.MaxInt32 {
+		return nil, status.Errorf(codes.InvalidArgument,
+			"gcp ResourceDriver(%s).Scale: replicas %d out of valid range [0, %d]",
+			req.GetResourceType(), replicas, math.MaxInt32)
+	}
+	out, err := driver.Scale(ctx, refFromPB(req.GetRef()), int(replicas)) //nolint:gosec // G115: range-checked above
 	if err != nil {
 		return nil, err
 	}

@@ -252,7 +252,10 @@ func (s *gcpIaCServer) DetectDriftWithSpecs(ctx context.Context, req *pb.DetectD
 
 func unmarshalJSONMap(b []byte) (map[string]any, error) {
 	if len(b) == 0 {
-		return nil, nil
+		// Return an empty map (not nil) so callers that index the map directly
+		// (e.g. provider.Initialize accessing config["project_id"]) receive a
+		// zero-value instead of operating on a nil map.
+		return map[string]any{}, nil
 	}
 	var out map[string]any
 	if err := json.Unmarshal(b, &out); err != nil {
