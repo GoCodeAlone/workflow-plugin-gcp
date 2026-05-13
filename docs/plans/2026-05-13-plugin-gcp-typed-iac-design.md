@@ -161,10 +161,6 @@ Note: the capability assertion value `"infra.container_service"` is the same for
 
 **Verification step (mandatory):** After writing `host_conformance_test.go` and `scripts/workflow-iac-host-conformance.sh`, the implementer MUST run the conformance script locally and confirm output contains `--- PASS: TestWorkflowHostConformance_LoadsTypedIaCPlugin` before declaring Phase 4 complete.
 
-### Phase 5 — Add `NewGCPProviderConcrete` constructor (merged into Phase 3)
-
-Note: The original Phase 5 heading was redundant — `NewGCPProviderConcrete()` is part of Phase 3's provider.go changes and is covered there. This phase heading is removed to avoid confusion.
-
 ## Compile-time guards
 
 ```go
