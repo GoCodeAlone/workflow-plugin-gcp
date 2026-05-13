@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-13
 **Author:** Claude Code (autonomous pipeline)
-**Status:** Draft (cycle-2 revision — addresses cycle-1 findings)
+**Status:** Draft (cycle-3 revision — addresses cycle-1 + cycle-2 findings)
 
 ## Context
 
@@ -52,8 +52,8 @@ Alternatives considered:
 | `internal/resourcedriver_server.go` | NEW: ResourceDriver CRUD dispatch per-type |
 | `internal/iacserver_test.go` | NEW: unit tests for server methods (mock provider) |
 | `internal/host_conformance_test.go` | NEW: typed-IaC load path smoke test |
-| `internal/contracts/gcp.proto` | NEW: GCPProviderConfig proto message |
-| `internal/contracts/gcp.pb.go` | NEW: generated pb (hand-rolled, mirrors aws.pb.go) |
+| `internal/contracts/gcp.proto` | NEW: GCPProviderConfig proto message (documentation only — no protoc generator setup needed; see note below) |
+| `internal/contracts/gcp.pb.go` | NEW: hand-rolled pb (mirrors aws.pb.go field-for-field; `.proto` is documentation, `.pb.go` is the actual source-of-truth) |
 
 **`gcpIaCServer` struct embeds** (mirrors AWS exactly):
 ```
@@ -109,7 +109,9 @@ The integration tests use `wftest` mock steps — they do not test any behavior 
 | `plugin.contracts.json` | NEW: `{"version":"v1","contracts":[{"kind":"module","type":"iac.provider","mode":"strict","config":"workflow.plugins.gcp.v1.GCPProviderConfig"}]}` |
 | `provider/provider.go` | Add `NewGCPProviderConcrete() *GCPProvider` constructor (plan-phase finding from AWS retro) |
 | `.goreleaser.yaml` | Update `main: .` → `main: ./cmd/workflow-plugin-gcp`; update `archives` section to include `plugin.json`, `plugin.contracts.json`, `LICENSE`; use only `provider.ProviderVersion` ldflag (do NOT add `internal.Version` — that var does not exist) |
-| `scripts/update-plugin-version.sh` | Update sed pattern for `workflow-plugin-gcp` → unchanged (already correct) |
+| `scripts/update-plugin-version.sh` | No changes needed — already handles version + URL rewriting correctly |
+
+**goreleaser `before.hooks`:** Keep the existing `bash scripts/update-plugin-version.sh {{ .Version }}` hook. Do NOT replace with the AWS inline `sed` commands — GCP already has a correct, more maintainable script. Only `main:` and `archives:` sections change.
 
 **Critical — goreleaser archives section:** The `archives` block MUST include the `files` stanza:
 ```yaml
@@ -134,14 +136,28 @@ Do NOT copy the AWS spurious `-X github.com/GoCodeAlone/workflow-plugin-gcp/inte
 | File | Action |
 |------|--------|
 | `.github/workflows/ci.yml` | Update `wfctl@v0.20.1` → `wfctl@v0.51.7` for strict-contracts gate; add `wfctl-strict-contracts` job matching AWS pattern |
-| `.github/workflows/iac-host-conformance.yml` | NEW: copy from AWS v1.0.0, adapt test name to `TestWorkflowHostConformance_LoadsTypedIaCPlugin` and binary path `./cmd/workflow-plugin-gcp` |
-| `scripts/workflow-iac-host-conformance.sh` | NEW: copy from AWS v1.0.0, adapt **test name** |
+| `.github/workflows/iac-host-conformance.yml` | NEW: copy from AWS v1.0.0; rename job from `legacy-module-engine-range` → `typed-iac-engine-range`; adapt binary path to `./cmd/workflow-plugin-gcp` |
+| `scripts/workflow-iac-host-conformance.sh` | NEW: copy from AWS v1.0.0, adapt **test name** (see below) |
+| `internal/host_conformance_test.go` | NEW: copy from AWS v1.0.0 with all 4 provider-specific substitutions (see below) |
 
 **Critical — conformance script test name:** `scripts/workflow-iac-host-conformance.sh` MUST run:
 ```bash
 WORKFLOW_IAC_HOST_CONFORMANCE=1 GOWORK=off go test ./internal -run TestWorkflowHostConformance_LoadsTypedIaCPlugin -count=1 -v
 ```
 NOT `-run TestWorkflowHostConformance_LoadsLegacyIaCModulePlugin` (which is the AWS test name for the legacy module load path). Using the AWS test name on GCP would silently pass with 0 tests run — the gate must be verified by asserting the test output contains `PASS` and the test name.
+
+**Required `host_conformance_test.go` substitutions (all must be changed from AWS copy):**
+
+| AWS string | GCP replacement |
+|---|---|
+| `"./cmd/workflow-plugin-aws"` (build target) | `"./cmd/workflow-plugin-gcp"` |
+| `name.GetName() != "aws"` (provider name assertion) | `name.GetName() != "gcp"` |
+| `capabilitiesHasResource(capabilities, "infra.container_service")` (capability check) | `capabilitiesHasResource(capabilities, "infra.container_service")` — same value, GCP supports this resource type |
+| doc comment: `"workflow-plugin-digitalocean v1.0.1 internal/host_conformance_test.go"` | `"workflow-plugin-aws v1.0.0 internal/host_conformance_test.go"` (update mirror citation) |
+
+Note: the capability assertion value `"infra.container_service"` is the same for GCP (Cloud Run maps to container_service). No substitution needed — but confirm `provider.Capabilities()` returns this type before finalizing.
+
+**CI workflow job name:** The AWS `iac-host-conformance.yml` uses job name `legacy-module-engine-range`. The GCP workflow MUST use job name `typed-iac-engine-range` to accurately describe the typed-IaC load path being tested.
 
 **Verification step (mandatory):** After writing `host_conformance_test.go` and `scripts/workflow-iac-host-conformance.sh`, the implementer MUST run the conformance script locally and confirm output contains `--- PASS: TestWorkflowHostConformance_LoadsTypedIaCPlugin` before declaring Phase 4 complete.
 
