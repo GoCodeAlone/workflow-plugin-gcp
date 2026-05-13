@@ -1,4 +1,4 @@
-package main_test
+package provider_test
 
 import (
 	"testing"
@@ -52,10 +52,10 @@ pipelines:
 func TestIntegration_GCPProvisionGKE(t *testing.T) {
 	rec := wftest.RecordStep("step.gcp_provision_gke")
 	rec.WithOutput(map[string]any{
-		"cluster_name":     "prod-cluster",
-		"endpoint":         "https://34.120.0.1",
-		"node_count":       3,
-		"status":           "RUNNING",
+		"cluster_name":      "prod-cluster",
+		"endpoint":          "https://34.120.0.1",
+		"node_count":        3,
+		"status":            "RUNNING",
 		"kubeconfig_secret": "prod-cluster-kubeconfig",
 	})
 
