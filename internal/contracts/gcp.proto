@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package workflow.plugins.gcp.v1;
+
+option go_package = "github.com/GoCodeAlone/workflow-plugin-gcp/internal/contracts;contracts";
+
+// GCPProviderConfig is the typed configuration for the iac.provider module
+// provided by workflow-plugin-gcp. All fields correspond to the map keys
+// accepted by the legacy Initialize(ctx, map[string]any) path.
+message GCPProviderConfig {
+  // project_id is the GCP project ID (required).
+  string project_id = 1;
+  // region is the GCP region (default: us-central1).
+  string region = 2;
+  // zone is the GCP zone (default: us-central1-a).
+  string zone = 3;
+  // credentials_file is the path to a GCP service account JSON key file.
+  // If empty, Application Default Credentials are used.
+  string credentials_file = 4;
+}
