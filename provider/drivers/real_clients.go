@@ -158,10 +158,30 @@ func (c *realGKEClient) GetCluster(ctx context.Context, projectID, location, clu
 	if err != nil {
 		return nil, err
 	}
+	// The output-key set (status / endpoint / version / nodeGroups) is the
+	// contract the workflow-core grpcKubernetesBackend host adapter reads to
+	// reconstruct KubernetesClusterState — pinned by ADR 0037.
+	nodeGroups := make([]map[string]any, 0, len(cluster.GetNodePools()))
+	for _, np := range cluster.GetNodePools() {
+		ng := map[string]any{
+			"name":    np.GetName(),
+			"current": int(np.GetInitialNodeCount()),
+		}
+		if cfg := np.GetConfig(); cfg != nil {
+			ng["instanceType"] = cfg.GetMachineType()
+		}
+		if as := np.GetAutoscaling(); as != nil && as.GetEnabled() {
+			ng["min"] = int(as.GetMinNodeCount())
+			ng["max"] = int(as.GetMaxNodeCount())
+		}
+		nodeGroups = append(nodeGroups, ng)
+	}
 	return map[string]any{
-		"name":     cluster.Name,
-		"endpoint": cluster.Endpoint,
-		"status":   cluster.Status.String(),
+		"name":       cluster.Name,
+		"endpoint":   cluster.Endpoint,
+		"status":     cluster.Status.String(),
+		"version":    cluster.GetCurrentMasterVersion(),
+		"nodeGroups": nodeGroups,
 	}, nil
 }
 

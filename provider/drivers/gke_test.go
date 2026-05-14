@@ -150,6 +150,85 @@ func TestGKEDriver_HealthCheck_Unhealthy(t *testing.T) {
 	}
 }
 
+// TestGKEDriver_Lifecycle exercises the full GKE lifecycle through the
+// ResourceDriver contract (create → read → delete), the cross-process path the
+// workflow-core grpcKubernetesBackend adapter drives (ADR 0037). It also pins
+// the Read output-key set the host adapter projects onto KubernetesClusterState.
+func TestGKEDriver_Lifecycle(t *testing.T) {
+	mock := &mockGKEClient{getResult: map[string]any{
+		"name":     "my-cluster",
+		"status":   "RUNNING",
+		"endpoint": "https://1.2.3.4",
+		"version":  "1.29.1",
+		"nodeGroups": []map[string]any{
+			{"name": "default-pool", "instanceType": "e2-medium", "min": 1, "max": 3, "current": 2},
+		},
+	}}
+	d := &GKEDriver{Client: mock, ProjectID: "test-project", Location: "us-central1-a"}
+
+	spec := interfaces.ResourceSpec{
+		Name: "my-cluster", Type: "infra.k8s_cluster",
+		Config: map[string]any{"name": "my-cluster", "machine_type": "e2-medium"},
+	}
+	created, err := d.Create(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	ref := interfaces.ResourceRef{Name: "my-cluster", Type: "infra.k8s_cluster", ProviderID: created.ProviderID}
+	read, err := d.Read(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	// Pinned output-key contract (ADR 0037): the workflow-core host adapter
+	// reads exactly these keys to reconstruct KubernetesClusterState.
+	for _, key := range []string{"status", "endpoint", "version", "nodeGroups"} {
+		if _, ok := read.Outputs[key]; !ok {
+			t.Errorf("Read output missing pinned key %q (host adapter depends on it)", key)
+		}
+	}
+
+	if err := d.Delete(context.Background(), ref); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+}
+
+// TestGKEDriver_Create_IdempotentOnAlreadyExists verifies Create resolves an
+// ALREADY_EXISTS response to success — preserving the in-core gkeBackend
+// behavior the cross-process path must keep (ADR 0037 Consequences).
+func TestGKEDriver_Create_IdempotentOnAlreadyExists(t *testing.T) {
+	d := &GKEDriver{
+		Client:    &mockGKEClient{createErr: fmt.Errorf("rpc error: code = AlreadyExists desc = Already Exists")},
+		ProjectID: "test-project",
+		Location:  "us-central1-a",
+	}
+	spec := interfaces.ResourceSpec{
+		Name: "dup-cluster", Type: "infra.k8s_cluster",
+		Config: map[string]any{"name": "dup-cluster"},
+	}
+	out, err := d.Create(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Create on ALREADY_EXISTS must resolve to success, got: %v", err)
+	}
+	if out == nil || out.ProviderID == "" {
+		t.Fatalf("Create on ALREADY_EXISTS must return a populated output, got: %+v", out)
+	}
+}
+
+// TestGKEDriver_Delete_IdempotentOnNotFound verifies Delete resolves a NOT_FOUND
+// response to success — preserving the in-core gkeBackend behavior (ADR 0037).
+func TestGKEDriver_Delete_IdempotentOnNotFound(t *testing.T) {
+	d := &GKEDriver{
+		Client:    &mockGKEClient{deleteErr: fmt.Errorf("rpc error: code = NotFound desc = NOT_FOUND")},
+		ProjectID: "test-project",
+		Location:  "us-central1-a",
+	}
+	ref := interfaces.ResourceRef{Name: "gone", Type: "infra.k8s_cluster", ProviderID: "gone"}
+	if err := d.Delete(context.Background(), ref); err != nil {
+		t.Fatalf("Delete on NOT_FOUND must resolve to success, got: %v", err)
+	}
+}
+
 func TestGKEDriver_Scale(t *testing.T) {
 	d := &GKEDriver{
 		Client:    &mockGKEClient{},

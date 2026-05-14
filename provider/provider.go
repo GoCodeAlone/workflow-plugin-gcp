@@ -60,9 +60,14 @@ func (p *GCPProvider) Initialize(ctx context.Context, config map[string]any) err
 		p.zone = z
 	}
 
-	// Build client options for authentication.
+	// Build client options for authentication. A serialized service-account
+	// JSON (the form CloudCredentials.ServiceAccountJSON crosses the wire as)
+	// takes precedence — resolved in-plugin via option.WithCredentialsJSON,
+	// exactly as the in-core gkeBackend's containerService did (ADR 0037).
 	var opts []option.ClientOption
-	if credFile, ok := config["credentials_file"].(string); ok && credFile != "" {
+	if saJSON, ok := config["service_account_json"].(string); ok && saJSON != "" {
+		opts = append(opts, option.WithCredentialsJSON([]byte(saJSON)))
+	} else if credFile, ok := config["credentials_file"].(string); ok && credFile != "" {
 		opts = append(opts, option.WithCredentialsFile(credFile))
 	}
 	// If no explicit credentials, the SDK will use Application Default Credentials.
