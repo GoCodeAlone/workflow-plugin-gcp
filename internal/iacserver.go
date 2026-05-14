@@ -42,8 +42,15 @@ type gcpIaCServer struct {
 	pb.UnimplementedIaCProviderValidatorServer
 	pb.UnimplementedIaCProviderDriftConfigDetectorServer
 	pb.UnimplementedResourceDriverServer
+	pb.UnimplementedIaCStateBackendServer
 
 	provider *provider.GCPProvider
+
+	// stateBackend serves the typed pb.IaCStateBackendServer surface
+	// (gcs backend). Per decisions/0035, this one type carries both the
+	// IaC-provider and the IaC-state-backend concerns. The backing store is
+	// constructed lazily via the Configure RPC — see internal/statebackend_server.go.
+	stateBackend stateBackend
 }
 
 // newGCPIaCServer constructs a typed-IaC server backed by the given
@@ -72,6 +79,10 @@ var (
 	// delegates to DetectDrift (existence-only behavior; ignores the specs map).
 	_ pb.IaCProviderDriftDetectorServer = (*gcpIaCServer)(nil)
 	_ pb.ResourceDriverServer           = (*gcpIaCServer)(nil)
+	// gcpIaCServer also SERVES the typed IaC state-backend contract (gcs
+	// backend). The SDK serve hook auto-registers this via type-assertion at
+	// plugin startup — see cmd/workflow-plugin-gcp/main.go.
+	_ pb.IaCStateBackendServer = (*gcpIaCServer)(nil)
 )
 
 // ── Required service methods ────────────────────────────────────────────────
