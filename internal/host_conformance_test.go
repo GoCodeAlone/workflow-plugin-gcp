@@ -138,3 +138,112 @@ func capabilitiesHasResource(capabilities *pb.CapabilitiesResponse, resourceType
 	}
 	return false
 }
+
+// TestCapabilityParity_IaCStateBackends asserts that every iac.state backend
+// name declared in plugin.json capabilities.iacStateBackends is actually
+// served by the plugin — i.e. returned by NewIaCServer().ListBackendNames.
+// This guards against a manifest claiming a backend the plugin does not serve.
+func TestCapabilityParity_IaCStateBackends(t *testing.T) {
+	repoRoot := hostConformanceRepoRoot(t)
+	data, err := os.ReadFile(filepath.Join(repoRoot, "plugin.json"))
+	if err != nil {
+		t.Fatalf("read plugin.json: %v", err)
+	}
+	var manifest struct {
+		Capabilities struct {
+			IaCStateBackends []string `json:"iacStateBackends"`
+		} `json:"capabilities"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("parse plugin.json: %v", err)
+	}
+
+	resp, err := NewIaCServer().ListBackendNames(context.Background(), &pb.ListBackendNamesRequest{})
+	if err != nil {
+		t.Fatalf("ListBackendNames: %v", err)
+	}
+	served := make(map[string]bool, len(resp.GetBackendNames()))
+	for _, n := range resp.GetBackendNames() {
+		served[n] = true
+	}
+
+	for _, declared := range manifest.Capabilities.IaCStateBackends {
+		if !served[declared] {
+			t.Errorf("plugin.json declares iacStateBackends entry %q but ListBackendNames does not serve it (served: %v)",
+				declared, resp.GetBackendNames())
+		}
+	}
+}
+
+// TestPluginJSONCapabilities_ModuleStep_Parity asserts that the type-name
+// keys in the providers wired into IaCServeOptions (ModuleProviders /
+// StepProviders) exactly match plugin.json's capabilities.moduleTypes /
+// capabilities.stepTypes (modulo the always-implicit "iac.provider" module
+// type, which is served via the IaC contract surface and is NOT a
+// standalone-module provider).
+//
+// This is the in-process equivalent of the gRPC bridge's GetModuleTypes /
+// GetStepTypes RPCs (the bridge surfaces ModuleProviders' keys verbatim via
+// plan-2 PR 1's mapBackedProvider adapter), and catches drift between
+// "what main.go wires" and "what plugin.json declares".
+func TestPluginJSONCapabilities_ModuleStep_Parity(t *testing.T) {
+	repoRoot := hostConformanceRepoRoot(t)
+	data, err := os.ReadFile(filepath.Join(repoRoot, "plugin.json"))
+	if err != nil {
+		t.Fatalf("read plugin.json: %v", err)
+	}
+	var manifest struct {
+		Capabilities struct {
+			ModuleTypes []string `json:"moduleTypes"`
+			StepTypes   []string `json:"stepTypes"`
+		} `json:"capabilities"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("parse plugin.json: %v", err)
+	}
+
+	declaredModules := map[string]bool{}
+	for _, m := range manifest.Capabilities.ModuleTypes {
+		if m == "iac.provider" {
+			continue
+		}
+		declaredModules[m] = true
+	}
+	servedModules := map[string]bool{}
+	for name := range ModuleProviders() {
+		servedModules[name] = true
+	}
+	for m := range declaredModules {
+		if !servedModules[m] {
+			t.Errorf("plugin.json declares moduleTypes entry %q but ModuleProviders does not serve it (served: %v)",
+				m, servedModules)
+		}
+	}
+	for m := range servedModules {
+		if !declaredModules[m] {
+			t.Errorf("ModuleProviders serves %q but plugin.json capabilities.moduleTypes does not declare it (declared: %v)",
+				m, declaredModules)
+		}
+	}
+
+	declaredSteps := map[string]bool{}
+	for _, s := range manifest.Capabilities.StepTypes {
+		declaredSteps[s] = true
+	}
+	servedSteps := map[string]bool{}
+	for name := range StepProviders() {
+		servedSteps[name] = true
+	}
+	for s := range declaredSteps {
+		if !servedSteps[s] {
+			t.Errorf("plugin.json declares stepTypes entry %q but StepProviders does not serve it (served: %v)",
+				s, servedSteps)
+		}
+	}
+	for s := range servedSteps {
+		if !declaredSteps[s] {
+			t.Errorf("StepProviders serves %q but plugin.json capabilities.stepTypes does not declare it (declared: %v)",
+				s, declaredSteps)
+		}
+	}
+}

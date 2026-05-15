@@ -3,6 +3,7 @@ package drivers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	apigateway "cloud.google.com/go/apigateway/apiv1"
 	apigatewpb "cloud.google.com/go/apigateway/apiv1/apigatewaypb"
@@ -121,6 +122,27 @@ func NewRealGKEClient(ctx context.Context, opts ...option.ClientOption) (GKEClie
 	return &realGKEClient{svc: svc}, nil
 }
 
+// gkeResourceName resolves a clusterID into the GKE API's full resource path.
+// Two accepted forms — handled here in the single chokepoint that knows the
+// GKE name format (per ADR 0037 / team-lead ruling on the FQN seam):
+//
+//   - clusterID already in the fully-qualified form
+//     "projects/<p>/locations/<l>/clusters/<n>" (what workflow-core's Task 25
+//     grpcKubernetesBackend host adapter writes into ResourceRef.ProviderId)
+//     → returned as-is; projectID / location parameters are ignored. The
+//     embedded path is the source of truth.
+//   - bare cluster name "<n>" (legacy in-process callers / Initialize-defaulted
+//     paths) → wrapped with the passed-in projectID / location.
+//
+// Centralizing here means consumers (GKEDriver, host adapters) can pass either
+// form without re-implementing the parse on every call site.
+func gkeResourceName(projectID, location, clusterID string) string {
+	if strings.HasPrefix(clusterID, "projects/") {
+		return clusterID
+	}
+	return fmt.Sprintf("projects/%s/locations/%s/clusters/%s", projectID, location, clusterID)
+}
+
 func (c *realGKEClient) CreateCluster(ctx context.Context, projectID, location string, config map[string]any) (string, error) {
 	clusterName, _ := config["name"].(string)
 	if clusterName == "" {
@@ -153,20 +175,40 @@ func (c *realGKEClient) CreateCluster(ctx context.Context, projectID, location s
 }
 
 func (c *realGKEClient) GetCluster(ctx context.Context, projectID, location, clusterID string) (map[string]any, error) {
-	name := fmt.Sprintf("projects/%s/locations/%s/clusters/%s", projectID, location, clusterID)
+	name := gkeResourceName(projectID, location, clusterID)
 	cluster, err := c.svc.GetCluster(ctx, &containerpb.GetClusterRequest{Name: name})
 	if err != nil {
 		return nil, err
 	}
+	// The output-key set (status / endpoint / version / nodeGroups) is the
+	// contract the workflow-core grpcKubernetesBackend host adapter reads to
+	// reconstruct KubernetesClusterState — pinned by ADR 0037.
+	nodeGroups := make([]map[string]any, 0, len(cluster.GetNodePools()))
+	for _, np := range cluster.GetNodePools() {
+		ng := map[string]any{
+			"name":    np.GetName(),
+			"current": int(np.GetInitialNodeCount()),
+		}
+		if cfg := np.GetConfig(); cfg != nil {
+			ng["instanceType"] = cfg.GetMachineType()
+		}
+		if as := np.GetAutoscaling(); as != nil && as.GetEnabled() {
+			ng["min"] = int(as.GetMinNodeCount())
+			ng["max"] = int(as.GetMaxNodeCount())
+		}
+		nodeGroups = append(nodeGroups, ng)
+	}
 	return map[string]any{
-		"name":     cluster.Name,
-		"endpoint": cluster.Endpoint,
-		"status":   cluster.Status.String(),
+		"name":       cluster.Name,
+		"endpoint":   cluster.Endpoint,
+		"status":     cluster.Status.String(),
+		"version":    cluster.GetCurrentMasterVersion(),
+		"nodeGroups": nodeGroups,
 	}, nil
 }
 
 func (c *realGKEClient) UpdateCluster(ctx context.Context, projectID, location, clusterID string, config map[string]any) error {
-	name := fmt.Sprintf("projects/%s/locations/%s/clusters/%s", projectID, location, clusterID)
+	name := gkeResourceName(projectID, location, clusterID)
 	if nodeCount, ok := config["node_count"].(int); ok {
 		_, err := c.svc.SetNodePoolSize(ctx, &containerpb.SetNodePoolSizeRequest{
 			Name:      name + "/nodePools/default-pool",
@@ -178,7 +220,7 @@ func (c *realGKEClient) UpdateCluster(ctx context.Context, projectID, location, 
 }
 
 func (c *realGKEClient) DeleteCluster(ctx context.Context, projectID, location, clusterID string) error {
-	name := fmt.Sprintf("projects/%s/locations/%s/clusters/%s", projectID, location, clusterID)
+	name := gkeResourceName(projectID, location, clusterID)
 	_, err := c.svc.DeleteCluster(ctx, &containerpb.DeleteClusterRequest{Name: name})
 	return err
 }

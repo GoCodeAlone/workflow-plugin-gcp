@@ -150,6 +150,186 @@ func TestGKEDriver_HealthCheck_Unhealthy(t *testing.T) {
 	}
 }
 
+// TestGKEDriver_Lifecycle exercises the full GKE lifecycle through the
+// ResourceDriver contract (create → read → delete), the cross-process path the
+// workflow-core grpcKubernetesBackend adapter drives (ADR 0037). It also pins
+// the Read output-key set the host adapter projects onto KubernetesClusterState.
+func TestGKEDriver_Lifecycle(t *testing.T) {
+	mock := &mockGKEClient{getResult: map[string]any{
+		"name":     "my-cluster",
+		"status":   "RUNNING",
+		"endpoint": "https://1.2.3.4",
+		"version":  "1.29.1",
+		"nodeGroups": []map[string]any{
+			{"name": "default-pool", "instanceType": "e2-medium", "min": 1, "max": 3, "current": 2},
+		},
+	}}
+	d := &GKEDriver{Client: mock, ProjectID: "test-project", Location: "us-central1-a"}
+
+	spec := interfaces.ResourceSpec{
+		Name: "my-cluster", Type: "infra.k8s_cluster",
+		Config: map[string]any{"name": "my-cluster", "machine_type": "e2-medium"},
+	}
+	created, err := d.Create(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	ref := interfaces.ResourceRef{Name: "my-cluster", Type: "infra.k8s_cluster", ProviderID: created.ProviderID}
+	read, err := d.Read(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	// Pinned output-key contract (ADR 0037): the workflow-core host adapter
+	// reads exactly these keys to reconstruct KubernetesClusterState.
+	for _, key := range []string{"status", "endpoint", "version", "nodeGroups"} {
+		if _, ok := read.Outputs[key]; !ok {
+			t.Errorf("Read output missing pinned key %q (host adapter depends on it)", key)
+		}
+	}
+
+	if err := d.Delete(context.Background(), ref); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+}
+
+// TestGKEDriver_Create_IdempotentOnAlreadyExists verifies Create resolves an
+// ALREADY_EXISTS response to success — preserving the in-core gkeBackend
+// behavior the cross-process path must keep (ADR 0037 Consequences).
+func TestGKEDriver_Create_IdempotentOnAlreadyExists(t *testing.T) {
+	d := &GKEDriver{
+		Client:    &mockGKEClient{createErr: fmt.Errorf("rpc error: code = AlreadyExists desc = Already Exists")},
+		ProjectID: "test-project",
+		Location:  "us-central1-a",
+	}
+	spec := interfaces.ResourceSpec{
+		Name: "dup-cluster", Type: "infra.k8s_cluster",
+		Config: map[string]any{"name": "dup-cluster"},
+	}
+	out, err := d.Create(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Create on ALREADY_EXISTS must resolve to success, got: %v", err)
+	}
+	if out == nil || out.ProviderID == "" {
+		t.Fatalf("Create on ALREADY_EXISTS must return a populated output, got: %+v", out)
+	}
+}
+
+// TestGKEResourceName locks the FQN-vs-bare-name handling that bridges
+// workflow-core Task 25's fully-qualified-ProviderId contract
+// ("projects/<p>/locations/<l>/clusters/<n>") into the GKE API's resource-name
+// argument. Centralizing detection in realGKEClient (per team-lead's ruling)
+// means consumers can pass either form and the wrap-or-passthrough decision
+// happens in this one chokepoint. Without it, an FQN clusterID would be
+// double-wrapped into a malformed path.
+func TestGKEResourceName(t *testing.T) {
+	cases := []struct {
+		name, projectID, location, clusterID, want string
+	}{
+		{
+			"fully-qualified Task 25 form → passthrough",
+			"ignored-p", "ignored-l", "projects/p/locations/loc/clusters/c",
+			"projects/p/locations/loc/clusters/c",
+		},
+		{
+			"bare cluster name → wrapped with project + location",
+			"my-p", "us-central1-a", "bare-c",
+			"projects/my-p/locations/us-central1-a/clusters/bare-c",
+		},
+		{
+			"empty clusterID → wrapped (legacy default)",
+			"my-p", "us-central1-a", "",
+			"projects/my-p/locations/us-central1-a/clusters/",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := gkeResourceName(tc.projectID, tc.location, tc.clusterID)
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestGKEDriver_Create_PerCallCredentialsFromSpec verifies that when the host
+// adapter supplies service_account_json + project_id in spec.Config (the
+// ADR-0037 canonical seam per team-lead's option-(a) ruling), Create builds a
+// per-call client via PerCallClientFactory and uses the spec-supplied project
+// — NOT the Initialize-time Client / ProjectID.
+func TestGKEDriver_Create_PerCallCredentialsFromSpec(t *testing.T) {
+	perCallMock := &mockGKEClient{}
+	factoryCalled := false
+	d := &GKEDriver{
+		Client:    nil, // proves Create does NOT fall back to the Initialize-time client
+		ProjectID: "init-project",
+		Location:  "us-central1-a",
+		PerCallClientFactory: func(_ context.Context, saJSON string) (GKEClient, error) {
+			if saJSON != `{"type":"service_account"}` {
+				t.Fatalf("per-call factory got unexpected SA JSON: %q", saJSON)
+			}
+			factoryCalled = true
+			return perCallMock, nil
+		},
+	}
+	spec := interfaces.ResourceSpec{
+		Name: "c", Type: "infra.k8s_cluster",
+		Config: map[string]any{
+			"name":                 "c",
+			"project_id":           "spec-project",
+			"service_account_json": `{"type":"service_account"}`,
+		},
+	}
+	out, err := d.Create(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if !factoryCalled {
+		t.Fatal("PerCallClientFactory was not invoked despite service_account_json in spec.Config")
+	}
+	if out.ProviderID != "cluster-123" {
+		t.Errorf("expected ProviderID=cluster-123, got %s", out.ProviderID)
+	}
+}
+
+// TestGKEDriver_Create_FallsBackToInitializeClientWhenNoCreds verifies that
+// when spec.Config carries no service_account_json, Create reuses the
+// Initialize-time Client (the fallback the engine relies on for Read/Delete +
+// for legacy in-process flows).
+func TestGKEDriver_Create_FallsBackToInitializeClientWhenNoCreds(t *testing.T) {
+	initMock := &mockGKEClient{}
+	d := &GKEDriver{
+		Client:    initMock,
+		ProjectID: "init-project",
+		Location:  "us-central1-a",
+		PerCallClientFactory: func(context.Context, string) (GKEClient, error) {
+			t.Fatal("PerCallClientFactory must NOT be invoked when spec.Config has no service_account_json")
+			return nil, nil
+		},
+	}
+	spec := interfaces.ResourceSpec{
+		Name: "c", Type: "infra.k8s_cluster",
+		Config: map[string]any{"name": "c"}, // no creds
+	}
+	if _, err := d.Create(context.Background(), spec); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+}
+
+// TestGKEDriver_Delete_IdempotentOnNotFound verifies Delete resolves a NOT_FOUND
+// response to success — preserving the in-core gkeBackend behavior (ADR 0037).
+func TestGKEDriver_Delete_IdempotentOnNotFound(t *testing.T) {
+	d := &GKEDriver{
+		Client:    &mockGKEClient{deleteErr: fmt.Errorf("rpc error: code = NotFound desc = NOT_FOUND")},
+		ProjectID: "test-project",
+		Location:  "us-central1-a",
+	}
+	ref := interfaces.ResourceRef{Name: "gone", Type: "infra.k8s_cluster", ProviderID: "gone"}
+	if err := d.Delete(context.Background(), ref); err != nil {
+		t.Fatalf("Delete on NOT_FOUND must resolve to success, got: %v", err)
+	}
+}
+
 func TestGKEDriver_Scale(t *testing.T) {
 	d := &GKEDriver{
 		Client:    &mockGKEClient{},

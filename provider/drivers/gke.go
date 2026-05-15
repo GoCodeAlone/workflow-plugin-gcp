@@ -3,20 +3,129 @@ package drivers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/GoCodeAlone/workflow/interfaces"
+	"google.golang.org/api/option"
+)
+
+// Per-Create credential keys read from ResourceSpec.config_json. These MUST
+// match the workflow-core grpcKubernetesBackend host adapter's k8sConfigKey*
+// constants (module/platform_kubernetes_grpc.go). Per ADR 0037 the host adapter
+// owns the key contract; this plugin conforms to it.
+const (
+	gkeConfigKeyProjectID          = "project_id"
+	gkeConfigKeyServiceAccountJSON = "service_account_json" //nolint:gosec // G101: config map key name, not a credential
 )
 
 // GKEDriver manages GKE clusters.
+//
+// Per ADR 0037 + workflow-core Task 25, credentials travel per-Create in
+// ResourceSpec.config_json under gkeConfigKey* keys: Create reads them and
+// builds a per-call GKE client via PerCallClientFactory. Read/Delete have no
+// per-request config (ResourceRef carries no config_json), so they fall back to
+// the Initialize-time Client — that fallback is the engine's responsibility to
+// wire with usable credentials when the cross-process gke flow drives Read/
+// Delete without a prior in-process Create. See team-lead's "option (a)"
+// ruling.
 type GKEDriver struct {
 	Client    GKEClient
 	ProjectID string
 	Location  string
+	// PerCallClientFactory builds a per-call GKEClient from a service-account
+	// JSON payload. Defaults (nil) to a real google.golang.org/api/container
+	// client built via option.WithCredentialsJSON. Tests override it to inject
+	// a mock client.
+	PerCallClientFactory func(ctx context.Context, saJSON string) (GKEClient, error)
 }
 
-func (d *GKEDriver) Create(ctx context.Context, spec interfaces.ResourceSpec) (*interfaces.ResourceOutput, error) {
-	id, err := d.Client.CreateCluster(ctx, d.ProjectID, d.Location, spec.Config)
+// resolveCreate selects the GKE client + project for a Create RPC. If the
+// caller supplies service_account_json in spec.Config, a per-call client is
+// built via PerCallClientFactory (the ADR-0037 canonical seam). Otherwise the
+// Initialize-time Client is used. project_id in spec.Config likewise overrides
+// the Initialize-time ProjectID.
+func (d *GKEDriver) resolveCreate(ctx context.Context, spec interfaces.ResourceSpec) (GKEClient, string, error) {
+	project := d.ProjectID
+	if p, ok := spec.Config[gkeConfigKeyProjectID].(string); ok && p != "" {
+		project = p
+	}
+	saJSON, _ := spec.Config[gkeConfigKeyServiceAccountJSON].(string)
+	if saJSON == "" {
+		return d.Client, project, nil
+	}
+	factory := d.PerCallClientFactory
+	if factory == nil {
+		factory = func(ctx context.Context, sa string) (GKEClient, error) {
+			return NewRealGKEClient(ctx, option.WithCredentialsJSON([]byte(sa)))
+		}
+	}
+	client, err := factory(ctx, saJSON)
 	if err != nil {
+		return nil, "", fmt.Errorf("build per-call gke client: %w", err)
+	}
+	return client, project, nil
+}
+
+// clusterNameFromSpec resolves the GKE cluster name from the spec — the
+// `name` config key, falling back to the resource name. Mirrors realGKEClient's
+// CreateCluster name resolution.
+func clusterNameFromSpec(spec interfaces.ResourceSpec) string {
+	if n, ok := spec.Config["name"].(string); ok && n != "" {
+		return n
+	}
+	return spec.Name
+}
+
+// isAlreadyExists reports whether a GKE Create error means the cluster already
+// exists — the cross-process path must swallow it as success, exactly as the
+// in-core gkeBackend did (ADR 0037 Consequences).
+func isAlreadyExists(err error) bool {
+	s := err.Error()
+	return strings.Contains(s, "AlreadyExists") ||
+		strings.Contains(s, "ALREADY_EXISTS") ||
+		strings.Contains(s, "Already Exists")
+}
+
+// isNotFound reports whether a GKE Delete error means the cluster is already
+// gone — Delete must swallow it as success, mirroring the in-core gkeBackend.
+func isNotFound(err error) bool {
+	s := err.Error()
+	return strings.Contains(s, "NotFound") ||
+		strings.Contains(s, "NOT_FOUND") ||
+		strings.Contains(s, "notFound")
+}
+
+// Note on ResourceRef.ProviderID forms: callers may pass either a bare cluster
+// name (legacy in-process flow) or the fully-qualified GKE path
+// "projects/<p>/locations/<l>/clusters/<n>" (the form workflow-core's Task 25
+// grpcKubernetesBackend writes). Per the team-lead ruling on the FQN seam, the
+// detection + selection lives in realGKEClient's single chokepoint
+// (gkeResourceName, real_clients.go); GKEDriver passes ref.ProviderID through
+// unchanged so consumers don't re-implement the parse.
+
+func (d *GKEDriver) Create(ctx context.Context, spec interfaces.ResourceSpec) (*interfaces.ResourceOutput, error) {
+	client, project, err := d.resolveCreate(ctx, spec)
+	if err != nil {
+		return nil, fmt.Errorf("gke create: %w", err)
+	}
+	id, err := client.CreateCluster(ctx, project, d.Location, spec.Config)
+	if err != nil {
+		if isAlreadyExists(err) {
+			// Idempotent: a pre-existing cluster is success — mirrors the
+			// in-core gkeBackend which swallowed ALREADY_EXISTS. Per ADR 0037.
+			name := clusterNameFromSpec(spec)
+			return &interfaces.ResourceOutput{
+				Name:       spec.Name,
+				Type:       spec.Type,
+				ProviderID: name,
+				Status:     "running",
+				Outputs: map[string]any{
+					"cluster_id": name,
+					"location":   d.Location,
+					"status":     "running",
+				},
+			}, nil
+		}
 		return nil, fmt.Errorf("gke create: %w", err)
 	}
 	return &interfaces.ResourceOutput{
@@ -59,6 +168,11 @@ func (d *GKEDriver) Update(ctx context.Context, ref interfaces.ResourceRef, spec
 
 func (d *GKEDriver) Delete(ctx context.Context, ref interfaces.ResourceRef) error {
 	if err := d.Client.DeleteCluster(ctx, d.ProjectID, d.Location, ref.ProviderID); err != nil {
+		if isNotFound(err) {
+			// Idempotent: an already-gone cluster is success — mirrors the
+			// in-core gkeBackend which swallowed NOT_FOUND. Per ADR 0037.
+			return nil
+		}
 		return fmt.Errorf("gke delete: %w", err)
 	}
 	return nil
