@@ -10,7 +10,7 @@ require (
 	cloud.google.com/go/redis v1.18.3
 	cloud.google.com/go/run v1.15.0
 	cloud.google.com/go/storage v1.61.3
-	github.com/GoCodeAlone/workflow v0.51.11-0.20260514225636-522748f35474
+	github.com/GoCodeAlone/workflow v0.52.0
 	google.golang.org/api v0.272.0
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
