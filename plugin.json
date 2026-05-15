@@ -6,7 +6,7 @@
   "type": "external",
   "tier": "community",
   "license": "MIT",
-  "minEngineVersion": "0.51.11-0.20260514225636-522748f35474",
+  "minEngineVersion": "0.52.0",
   "repository": "https://github.com/GoCodeAlone/workflow-plugin-gcp",
   "keywords": ["gcp", "google-cloud", "iac", "provider", "infrastructure"],
   "capabilities": {
