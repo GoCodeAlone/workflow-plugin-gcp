@@ -6,6 +6,18 @@
       "type": "iac.provider",
       "mode": "strict",
       "config": "workflow.plugins.gcp.v1.GCPProviderConfig"
+    },
+    {
+      "kind": "module",
+      "type": "gcp.credentials",
+      "mode": "strict",
+      "config": "workflow.plugins.gcp.v1.GCPCredentialsConfig"
+    },
+    {
+      "kind": "module",
+      "type": "storage.gcs",
+      "mode": "strict",
+      "config": "workflow.plugins.gcp.v1.GCSStorageConfig"
     }
   ]
 }

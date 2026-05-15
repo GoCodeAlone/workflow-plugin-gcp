@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package workflow.plugins.gcp.v1;
+
+option go_package = "github.com/GoCodeAlone/workflow-plugin-gcp/internal/contracts;contracts";
+
+// gcp_plan2.proto declares the typed config messages for the plugin-native
+// modules introduced in plan-2 PR 3:
+//   - gcp.credentials (module)
+//   - storage.gcs (module)
+//
+// The Provider implementations in this repo stay on the legacy
+// sdk.ModuleProvider config-Struct path per plan-2's "TypedModuleProvider
+// out for v1" Non-Goal. The messages below back the `mode:"strict"`
+// descriptors in plugin.contracts.json so the strict-contracts CI gate is
+// satisfied honestly (consistent with the existing `iac.provider`
+// precedent in gcp.proto) and act as a drop-in target for a future
+// TypedModuleProvider migration. See decisions/0039.
+
+// GCPCredentialsBlock mirrors the YAML `credentials:` sub-block the
+// plan-2 gcp modules accept. Consumed by gcpcreds.BuildGCPOptions (see
+// internal/gcpcreds/gcpcreds.go).
+message GCPCredentialsBlock {
+  // project_id is the GCP project ID. Carried for downstream consumers
+  // (quota-project wiring); BuildGCPOptions itself does NOT synthesize a
+  // credential option from project_id alone.
+  string project_id = 1;
+  // service_account_json is an inline GCP service-account JSON key.
+  // Non-empty → option.WithCredentialsJSON. Empty → Application Default
+  // Credentials.
+  string service_account_json = 2;
+}
+
+// GCPCredentialsConfig is the typed configuration for the gcp.credentials
+// standalone module. The module registers the parsed credentials block in
+// the process-local credref registry under the module's own name so
+// sibling storage.gcs modules can reference it via `credentials_ref:`.
+message GCPCredentialsConfig {
+  // project_id — top-level back-compat alias for credentials.project_id.
+  // Nested credentials.project_id wins when both are supplied.
+  string project_id = 1;
+  GCPCredentialsBlock credentials = 2;
+}
+
+// GCSStorageConfig is the typed configuration for the storage.gcs module.
+// The module exposes List/Get/Put/Delete/Stat/MkdirAll operations against
+// the named bucket. Credentials come from EITHER the inline
+// `credentials:` block OR `credentials_ref:` (a sibling gcp.credentials
+// module name) — inline wins when both are supplied; empty → Application
+// Default Credentials.
+message GCSStorageConfig {
+  // bucket is the GCS bucket name (REQUIRED).
+  string bucket = 1;
+  // prefix is an optional object-key prefix applied to all operations.
+  string prefix = 2;
+  // credentials_ref names a gcp.credentials module to look up in the
+  // process-local credref registry. Mutually exclusive with `credentials`;
+  // inline credentials win when both are supplied.
+  string credentials_ref = 3;
+  GCPCredentialsBlock credentials = 4;
+}
