@@ -215,6 +215,70 @@ func TestGKEDriver_Create_IdempotentOnAlreadyExists(t *testing.T) {
 	}
 }
 
+// TestGKEDriver_Create_PerCallCredentialsFromSpec verifies that when the host
+// adapter supplies service_account_json + project_id in spec.Config (the
+// ADR-0037 canonical seam per team-lead's option-(a) ruling), Create builds a
+// per-call client via PerCallClientFactory and uses the spec-supplied project
+// — NOT the Initialize-time Client / ProjectID.
+func TestGKEDriver_Create_PerCallCredentialsFromSpec(t *testing.T) {
+	perCallMock := &mockGKEClient{}
+	factoryCalled := false
+	d := &GKEDriver{
+		Client:    nil, // proves Create does NOT fall back to the Initialize-time client
+		ProjectID: "init-project",
+		Location:  "us-central1-a",
+		PerCallClientFactory: func(_ context.Context, saJSON string) (GKEClient, error) {
+			if saJSON != `{"type":"service_account"}` {
+				t.Fatalf("per-call factory got unexpected SA JSON: %q", saJSON)
+			}
+			factoryCalled = true
+			return perCallMock, nil
+		},
+	}
+	spec := interfaces.ResourceSpec{
+		Name: "c", Type: "infra.k8s_cluster",
+		Config: map[string]any{
+			"name":                 "c",
+			"project_id":           "spec-project",
+			"service_account_json": `{"type":"service_account"}`,
+		},
+	}
+	out, err := d.Create(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if !factoryCalled {
+		t.Fatal("PerCallClientFactory was not invoked despite service_account_json in spec.Config")
+	}
+	if out.ProviderID != "cluster-123" {
+		t.Errorf("expected ProviderID=cluster-123, got %s", out.ProviderID)
+	}
+}
+
+// TestGKEDriver_Create_FallsBackToInitializeClientWhenNoCreds verifies that
+// when spec.Config carries no service_account_json, Create reuses the
+// Initialize-time Client (the fallback the engine relies on for Read/Delete +
+// for legacy in-process flows).
+func TestGKEDriver_Create_FallsBackToInitializeClientWhenNoCreds(t *testing.T) {
+	initMock := &mockGKEClient{}
+	d := &GKEDriver{
+		Client:    initMock,
+		ProjectID: "init-project",
+		Location:  "us-central1-a",
+		PerCallClientFactory: func(context.Context, string) (GKEClient, error) {
+			t.Fatal("PerCallClientFactory must NOT be invoked when spec.Config has no service_account_json")
+			return nil, nil
+		},
+	}
+	spec := interfaces.ResourceSpec{
+		Name: "c", Type: "infra.k8s_cluster",
+		Config: map[string]any{"name": "c"}, // no creds
+	}
+	if _, err := d.Create(context.Background(), spec); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+}
+
 // TestGKEDriver_Delete_IdempotentOnNotFound verifies Delete resolves a NOT_FOUND
 // response to success — preserving the in-core gkeBackend behavior (ADR 0037).
 func TestGKEDriver_Delete_IdempotentOnNotFound(t *testing.T) {

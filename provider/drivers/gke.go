@@ -6,13 +6,64 @@ import (
 	"strings"
 
 	"github.com/GoCodeAlone/workflow/interfaces"
+	"google.golang.org/api/option"
+)
+
+// Per-Create credential keys read from ResourceSpec.config_json. These MUST
+// match the workflow-core grpcKubernetesBackend host adapter's k8sConfigKey*
+// constants (module/platform_kubernetes_grpc.go). Per ADR 0037 the host adapter
+// owns the key contract; this plugin conforms to it.
+const (
+	gkeConfigKeyProjectID          = "project_id"
+	gkeConfigKeyServiceAccountJSON = "service_account_json" //nolint:gosec // G101: config map key name, not a credential
 )
 
 // GKEDriver manages GKE clusters.
+//
+// Per ADR 0037 + workflow-core Task 25, credentials travel per-Create in
+// ResourceSpec.config_json under gkeConfigKey* keys: Create reads them and
+// builds a per-call GKE client via PerCallClientFactory. Read/Delete have no
+// per-request config (ResourceRef carries no config_json), so they fall back to
+// the Initialize-time Client — that fallback is the engine's responsibility to
+// wire with usable credentials when the cross-process gke flow drives Read/
+// Delete without a prior in-process Create. See team-lead's "option (a)"
+// ruling.
 type GKEDriver struct {
 	Client    GKEClient
 	ProjectID string
 	Location  string
+	// PerCallClientFactory builds a per-call GKEClient from a service-account
+	// JSON payload. Defaults (nil) to a real google.golang.org/api/container
+	// client built via option.WithCredentialsJSON. Tests override it to inject
+	// a mock client.
+	PerCallClientFactory func(ctx context.Context, saJSON string) (GKEClient, error)
+}
+
+// resolveCreate selects the GKE client + project for a Create RPC. If the
+// caller supplies service_account_json in spec.Config, a per-call client is
+// built via PerCallClientFactory (the ADR-0037 canonical seam). Otherwise the
+// Initialize-time Client is used. project_id in spec.Config likewise overrides
+// the Initialize-time ProjectID.
+func (d *GKEDriver) resolveCreate(ctx context.Context, spec interfaces.ResourceSpec) (GKEClient, string, error) {
+	project := d.ProjectID
+	if p, ok := spec.Config[gkeConfigKeyProjectID].(string); ok && p != "" {
+		project = p
+	}
+	saJSON, _ := spec.Config[gkeConfigKeyServiceAccountJSON].(string)
+	if saJSON == "" {
+		return d.Client, project, nil
+	}
+	factory := d.PerCallClientFactory
+	if factory == nil {
+		factory = func(ctx context.Context, sa string) (GKEClient, error) {
+			return NewRealGKEClient(ctx, option.WithCredentialsJSON([]byte(sa)))
+		}
+	}
+	client, err := factory(ctx, saJSON)
+	if err != nil {
+		return nil, "", fmt.Errorf("build per-call gke client: %w", err)
+	}
+	return client, project, nil
 }
 
 // clusterNameFromSpec resolves the GKE cluster name from the spec — the
@@ -45,7 +96,11 @@ func isNotFound(err error) bool {
 }
 
 func (d *GKEDriver) Create(ctx context.Context, spec interfaces.ResourceSpec) (*interfaces.ResourceOutput, error) {
-	id, err := d.Client.CreateCluster(ctx, d.ProjectID, d.Location, spec.Config)
+	client, project, err := d.resolveCreate(ctx, spec)
+	if err != nil {
+		return nil, fmt.Errorf("gke create: %w", err)
+	}
+	id, err := client.CreateCluster(ctx, project, d.Location, spec.Config)
 	if err != nil {
 		if isAlreadyExists(err) {
 			// Idempotent: a pre-existing cluster is success — mirrors the
