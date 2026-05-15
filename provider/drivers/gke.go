@@ -95,30 +95,13 @@ func isNotFound(err error) bool {
 		strings.Contains(s, "notFound")
 }
 
-// gkeResourceFromRef parses a ResourceRef into (project, location, clusterName)
-// — accepting two ProviderID forms:
-//
-//   - Fully-qualified: "projects/<p>/locations/<l>/clusters/<n>" — the form
-//     workflow-core's grpcKubernetesBackend host adapter writes after Task 25's
-//     fully-qualified-ProviderId fix (GKE names alone are not globally unique).
-//   - Bare cluster name "<n>" or empty — falls back to d.ProjectID / d.Location
-//     for the missing components (the legacy in-process form + a defensive
-//     default for callers that haven't migrated).
-//
-// The realGKEClient's GetCluster / DeleteCluster / UpdateCluster expect bare
-// (projectID, location, clusterID) components and wrap them into the FQN
-// themselves — so the driver must NOT pass an FQN straight through (that would
-// double-wrap into a malformed path).
-func (d *GKEDriver) gkeResourceFromRef(ref interfaces.ResourceRef) (project, location, clusterName string) {
-	pid := ref.ProviderID
-	if strings.HasPrefix(pid, "projects/") {
-		parts := strings.Split(pid, "/")
-		if len(parts) == 6 && parts[0] == "projects" && parts[2] == "locations" && parts[4] == "clusters" {
-			return parts[1], parts[3], parts[5]
-		}
-	}
-	return d.ProjectID, d.Location, pid
-}
+// Note on ResourceRef.ProviderID forms: callers may pass either a bare cluster
+// name (legacy in-process flow) or the fully-qualified GKE path
+// "projects/<p>/locations/<l>/clusters/<n>" (the form workflow-core's Task 25
+// grpcKubernetesBackend writes). Per the team-lead ruling on the FQN seam, the
+// detection + selection lives in realGKEClient's single chokepoint
+// (gkeResourceName, real_clients.go); GKEDriver passes ref.ProviderID through
+// unchanged so consumers don't re-implement the parse.
 
 func (d *GKEDriver) Create(ctx context.Context, spec interfaces.ResourceSpec) (*interfaces.ResourceOutput, error) {
 	client, project, err := d.resolveCreate(ctx, spec)
@@ -159,8 +142,7 @@ func (d *GKEDriver) Create(ctx context.Context, spec interfaces.ResourceSpec) (*
 }
 
 func (d *GKEDriver) Read(ctx context.Context, ref interfaces.ResourceRef) (*interfaces.ResourceOutput, error) {
-	project, location, clusterName := d.gkeResourceFromRef(ref)
-	info, err := d.Client.GetCluster(ctx, project, location, clusterName)
+	info, err := d.Client.GetCluster(ctx, d.ProjectID, d.Location, ref.ProviderID)
 	if err != nil {
 		return nil, fmt.Errorf("gke read: %w", err)
 	}
@@ -178,16 +160,14 @@ func (d *GKEDriver) Read(ctx context.Context, ref interfaces.ResourceRef) (*inte
 }
 
 func (d *GKEDriver) Update(ctx context.Context, ref interfaces.ResourceRef, spec interfaces.ResourceSpec) (*interfaces.ResourceOutput, error) {
-	project, location, clusterName := d.gkeResourceFromRef(ref)
-	if err := d.Client.UpdateCluster(ctx, project, location, clusterName, spec.Config); err != nil {
+	if err := d.Client.UpdateCluster(ctx, d.ProjectID, d.Location, ref.ProviderID, spec.Config); err != nil {
 		return nil, fmt.Errorf("gke update: %w", err)
 	}
 	return d.Read(ctx, ref)
 }
 
 func (d *GKEDriver) Delete(ctx context.Context, ref interfaces.ResourceRef) error {
-	project, location, clusterName := d.gkeResourceFromRef(ref)
-	if err := d.Client.DeleteCluster(ctx, project, location, clusterName); err != nil {
+	if err := d.Client.DeleteCluster(ctx, d.ProjectID, d.Location, ref.ProviderID); err != nil {
 		if isNotFound(err) {
 			// Idempotent: an already-gone cluster is success — mirrors the
 			// in-core gkeBackend which swallowed NOT_FOUND. Per ADR 0037.
@@ -212,8 +192,7 @@ func (d *GKEDriver) Diff(_ context.Context, desired interfaces.ResourceSpec, cur
 }
 
 func (d *GKEDriver) HealthCheck(ctx context.Context, ref interfaces.ResourceRef) (*interfaces.HealthResult, error) {
-	project, location, clusterName := d.gkeResourceFromRef(ref)
-	info, err := d.Client.GetCluster(ctx, project, location, clusterName)
+	info, err := d.Client.GetCluster(ctx, d.ProjectID, d.Location, ref.ProviderID)
 	if err != nil {
 		return &interfaces.HealthResult{Healthy: false, Message: err.Error()}, nil
 	}
@@ -223,9 +202,8 @@ func (d *GKEDriver) HealthCheck(ctx context.Context, ref interfaces.ResourceRef)
 }
 
 func (d *GKEDriver) Scale(ctx context.Context, ref interfaces.ResourceRef, replicas int) (*interfaces.ResourceOutput, error) {
-	project, location, clusterName := d.gkeResourceFromRef(ref)
 	cfg := map[string]any{"node_count": replicas}
-	if err := d.Client.UpdateCluster(ctx, project, location, clusterName, cfg); err != nil {
+	if err := d.Client.UpdateCluster(ctx, d.ProjectID, d.Location, ref.ProviderID, cfg); err != nil {
 		return nil, fmt.Errorf("gke scale: %w", err)
 	}
 	return d.Read(ctx, ref)

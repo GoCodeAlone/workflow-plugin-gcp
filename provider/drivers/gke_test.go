@@ -215,27 +215,38 @@ func TestGKEDriver_Create_IdempotentOnAlreadyExists(t *testing.T) {
 	}
 }
 
-// TestGKEDriver_GKEResourceFromRef locks the ResourceRef.ProviderID parsing
-// that bridges workflow-core Task 25's fully-qualified-ProviderId contract
-// (projects/<p>/locations/<l>/clusters/<n>) into the (projectID, location,
-// clusterID) tuple the realGKEClient expects. Without this parser the
-// realGKEClient's FQN-wrapping would double-wrap into a malformed path.
-func TestGKEDriver_GKEResourceFromRef(t *testing.T) {
-	d := &GKEDriver{ProjectID: "default-p", Location: "default-l"}
+// TestGKEResourceName locks the FQN-vs-bare-name handling that bridges
+// workflow-core Task 25's fully-qualified-ProviderId contract
+// ("projects/<p>/locations/<l>/clusters/<n>") into the GKE API's resource-name
+// argument. Centralizing detection in realGKEClient (per team-lead's ruling)
+// means consumers can pass either form and the wrap-or-passthrough decision
+// happens in this one chokepoint. Without it, an FQN clusterID would be
+// double-wrapped into a malformed path.
+func TestGKEResourceName(t *testing.T) {
 	cases := []struct {
-		name, providerID                string
-		wantProject, wantLoc, wantClust string
+		name, projectID, location, clusterID, want string
 	}{
-		{"fully-qualified Task 25 form", "projects/p/locations/loc/clusters/c", "p", "loc", "c"},
-		{"bare cluster name → driver defaults", "bare-c", "default-p", "default-l", "bare-c"},
-		{"empty providerID → driver defaults", "", "default-p", "default-l", ""},
-		{"malformed projects/ prefix → driver defaults", "projects/x", "default-p", "default-l", "projects/x"},
+		{
+			"fully-qualified Task 25 form → passthrough",
+			"ignored-p", "ignored-l", "projects/p/locations/loc/clusters/c",
+			"projects/p/locations/loc/clusters/c",
+		},
+		{
+			"bare cluster name → wrapped with project + location",
+			"my-p", "us-central1-a", "bare-c",
+			"projects/my-p/locations/us-central1-a/clusters/bare-c",
+		},
+		{
+			"empty clusterID → wrapped (legacy default)",
+			"my-p", "us-central1-a", "",
+			"projects/my-p/locations/us-central1-a/clusters/",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			p, l, c := d.gkeResourceFromRef(interfaces.ResourceRef{ProviderID: tc.providerID})
-			if p != tc.wantProject || l != tc.wantLoc || c != tc.wantClust {
-				t.Errorf("got (%q, %q, %q), want (%q, %q, %q)", p, l, c, tc.wantProject, tc.wantLoc, tc.wantClust)
+			got := gkeResourceName(tc.projectID, tc.location, tc.clusterID)
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
 			}
 		})
 	}
