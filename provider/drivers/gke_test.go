@@ -215,6 +215,32 @@ func TestGKEDriver_Create_IdempotentOnAlreadyExists(t *testing.T) {
 	}
 }
 
+// TestGKEDriver_GKEResourceFromRef locks the ResourceRef.ProviderID parsing
+// that bridges workflow-core Task 25's fully-qualified-ProviderId contract
+// (projects/<p>/locations/<l>/clusters/<n>) into the (projectID, location,
+// clusterID) tuple the realGKEClient expects. Without this parser the
+// realGKEClient's FQN-wrapping would double-wrap into a malformed path.
+func TestGKEDriver_GKEResourceFromRef(t *testing.T) {
+	d := &GKEDriver{ProjectID: "default-p", Location: "default-l"}
+	cases := []struct {
+		name, providerID                string
+		wantProject, wantLoc, wantClust string
+	}{
+		{"fully-qualified Task 25 form", "projects/p/locations/loc/clusters/c", "p", "loc", "c"},
+		{"bare cluster name → driver defaults", "bare-c", "default-p", "default-l", "bare-c"},
+		{"empty providerID → driver defaults", "", "default-p", "default-l", ""},
+		{"malformed projects/ prefix → driver defaults", "projects/x", "default-p", "default-l", "projects/x"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p, l, c := d.gkeResourceFromRef(interfaces.ResourceRef{ProviderID: tc.providerID})
+			if p != tc.wantProject || l != tc.wantLoc || c != tc.wantClust {
+				t.Errorf("got (%q, %q, %q), want (%q, %q, %q)", p, l, c, tc.wantProject, tc.wantLoc, tc.wantClust)
+			}
+		})
+	}
+}
+
 // TestGKEDriver_Create_PerCallCredentialsFromSpec verifies that when the host
 // adapter supplies service_account_json + project_id in spec.Config (the
 // ADR-0037 canonical seam per team-lead's option-(a) ruling), Create builds a
