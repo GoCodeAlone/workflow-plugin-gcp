@@ -59,6 +59,22 @@ func TestGCPIaCServer_Capabilities_HasContainerService(t *testing.T) {
 	}
 }
 
+// TestGCPIaCServer_Capabilities_ComputePlanVersionV2 pins the Phase 2
+// contract signal: the plugin MUST declare ComputePlanVersion="v2" so
+// wfctl v0.54.0+ knows to expect populated ApplyResult.Actions. Per
+// workflow#640 Phase 2 + ADR 0040. A typo or accidental drop in
+// internal/iacserver.go Capabilities() return literal fails this test.
+func TestGCPIaCServer_Capabilities_ComputePlanVersionV2(t *testing.T) {
+	s := NewIaCServer()
+	resp, err := s.Capabilities(context.Background(), &pb.CapabilitiesRequest{})
+	if err != nil {
+		t.Fatalf("Capabilities: %v", err)
+	}
+	if got, want := resp.GetComputePlanVersion(), "v2"; got != want {
+		t.Errorf("ComputePlanVersion: got %q, want %q", got, want)
+	}
+}
+
 func TestGCPIaCServer_Initialize_MissingProjectID(t *testing.T) {
 	s := NewIaCServer()
 	_, err := s.Initialize(context.Background(), &pb.InitializeRequest{ConfigJson: []byte(`{}`)})
