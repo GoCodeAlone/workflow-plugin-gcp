@@ -6,7 +6,7 @@
   "type": "external",
   "tier": "community",
   "license": "MIT",
-  "minEngineVersion": "0.56.0-rc1",
+  "minEngineVersion": "0.57.0-rc1",
   "repository": "https://github.com/GoCodeAlone/workflow-plugin-gcp",
   "keywords": [
     "gcp",
