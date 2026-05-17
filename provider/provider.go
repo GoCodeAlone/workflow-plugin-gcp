@@ -223,63 +223,6 @@ func (p *GCPProvider) Plan(ctx context.Context, desired []interfaces.ResourceSpe
 	return plan, nil
 }
 
-func (p *GCPProvider) Apply(ctx context.Context, plan *interfaces.IaCPlan) (*interfaces.ApplyResult, error) {
-	result := &interfaces.ApplyResult{PlanID: plan.ID}
-
-	for _, action := range plan.Actions {
-		drv, err := p.ResourceDriver(action.Resource.Type)
-		if err != nil {
-			result.Errors = append(result.Errors, interfaces.ActionError{
-				Resource: action.Resource.Name, Action: action.Action, Error: err.Error(),
-			})
-			continue
-		}
-
-		var out *interfaces.ResourceOutput
-
-		switch action.Action {
-		case "create":
-			out, err = drv.Create(ctx, action.Resource)
-		case "update":
-			ref := interfaces.ResourceRef{
-				Name: action.Resource.Name, Type: action.Resource.Type,
-			}
-			if action.Current != nil {
-				ref.ProviderID = action.Current.ProviderID
-			}
-			out, err = drv.Update(ctx, ref, action.Resource)
-		case "replace":
-			if action.Current != nil {
-				ref := interfaces.ResourceRef{
-					Name: action.Current.Name, Type: action.Current.Type, ProviderID: action.Current.ProviderID,
-				}
-				_ = drv.Delete(ctx, ref)
-			}
-			out, err = drv.Create(ctx, action.Resource)
-		case "delete":
-			ref := interfaces.ResourceRef{
-				Name: action.Resource.Name, Type: action.Resource.Type,
-			}
-			if action.Current != nil {
-				ref.ProviderID = action.Current.ProviderID
-			}
-			err = drv.Delete(ctx, ref)
-		}
-
-		if err != nil {
-			result.Errors = append(result.Errors, interfaces.ActionError{
-				Resource: action.Resource.Name, Action: action.Action, Error: err.Error(),
-			})
-			continue
-		}
-		if out != nil {
-			result.Resources = append(result.Resources, *out)
-		}
-	}
-
-	return result, nil
-}
-
 func (p *GCPProvider) Destroy(ctx context.Context, resources []interfaces.ResourceRef) (*interfaces.DestroyResult, error) {
 	result := &interfaces.DestroyResult{}
 	for _, ref := range resources {
