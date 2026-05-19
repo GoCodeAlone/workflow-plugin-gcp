@@ -1,0 +1,18 @@
+# Minimal workflow-plugin-gcp example
+# Authentication: Application Default Credentials by default.
+# Set GCP_PROJECT to your GCP project ID.
+# To use a service account key file instead, set credentials_file on the
+# iac.provider module (or set GOOGLE_APPLICATION_CREDENTIALS in your shell).
+
+version: 1
+
+modules:
+  - name: gcp-credentials
+    type: gcp.credentials
+    config:
+      projectId: ${GCP_PROJECT}
+
+  - name: gcp-provider
+    type: iac.provider
+    config:
+      project_id: ${GCP_PROJECT}

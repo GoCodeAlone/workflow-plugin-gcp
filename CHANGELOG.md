@@ -2,8 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- `README.md` with experimental banner, module type list, install instructions, and authentication notes (2026-05-19 OSS-readiness QoL sweep).
+- `CONTRIBUTING.md` with local development and PR guidelines.
+- `examples/minimal/config.yaml` — minimal `gcp.credentials` + `iac.provider` config validated via `wfctl validate`.
+- `.github/PULL_REQUEST_TEMPLATE.md` and `.github/ISSUE_TEMPLATE/` (bug report + feature request).
 
 ## [2.0.0-rc1] — 2026-05-17
 
