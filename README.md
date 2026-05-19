@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go Reference](https://pkg.go.dev/badge/github.com/GoCodeAlone/workflow-plugin-gcp.svg)](https://pkg.go.dev/github.com/GoCodeAlone/workflow-plugin-gcp)
 
-GCP provider plugin for workflow IaC — manages GKE, Cloud SQL, Memorystore, Compute Engine, Cloud Storage, Cloud Pub/Sub, Cloud Functions, Cloud DNS, Cloud Load Balancing, Cloud Armor, Secret Manager, Cloud CDN, and IAM resources.
+GCP provider plugin for workflow IaC — manages Cloud Run, GKE, Cloud SQL, Memorystore, VPC, Load Balancer, Cloud DNS, Artifact Registry, API Gateway, Firewall, IAM roles, Cloud Storage, and SSL certificates.
 
 ## What it provides
 
@@ -37,7 +37,7 @@ wfctl plugin install
 
 See `examples/minimal/config.yaml`.
 
-Required env vars: `GOOGLE_APPLICATION_CREDENTIALS`, `GCP_PROJECT`.
+Authentication: Application Default Credentials by default; or set `GOOGLE_APPLICATION_CREDENTIALS` (path to a service account JSON file). Set `GCP_PROJECT` for use in config templates.
 
 ## Documentation
 
