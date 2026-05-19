@@ -1,0 +1,17 @@
+# Minimal workflow-plugin-gcp example
+# Requires: GOOGLE_APPLICATION_CREDENTIALS, GCP_PROJECT env vars
+
+version: 1
+
+modules:
+  - name: gcp-credentials
+    type: gcp.credentials
+    config:
+      credentialsFile: ${GOOGLE_APPLICATION_CREDENTIALS}
+      project: ${GCP_PROJECT}
+
+  - name: gcp-provider
+    type: iac.provider
+    config:
+      provider: gcp
+      credentials: gcp-credentials
