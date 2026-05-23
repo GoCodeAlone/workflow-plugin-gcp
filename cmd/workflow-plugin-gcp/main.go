@@ -12,11 +12,13 @@ package main
 
 import (
 	"github.com/GoCodeAlone/workflow-plugin-gcp/internal"
+	"github.com/GoCodeAlone/workflow-plugin-gcp/provider"
 	sdk "github.com/GoCodeAlone/workflow/plugin/external/sdk"
 )
 
 func main() {
 	sdk.ServeIaCPlugin(internal.NewIaCServer(), sdk.IaCServeOptions{
-		Modules: internal.ModuleProviders(),
+		Modules:      internal.ModuleProviders(),
+		BuildVersion: sdk.ResolveBuildVersion(provider.Version),
 	})
 }

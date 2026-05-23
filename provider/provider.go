@@ -12,9 +12,12 @@ import (
 
 const providerName = "gcp"
 
-// ProviderVersion is set at build time via -ldflags
-// "-X github.com/GoCodeAlone/workflow-plugin-gcp/provider.ProviderVersion=X.Y.Z".
-var ProviderVersion = "dev"
+// Version is set at build time via -ldflags
+// "-X github.com/GoCodeAlone/workflow-plugin-gcp/provider.Version=X.Y.Z".
+// The name `Version` (not `ProviderVersion`) is required to match the
+// `-X *.Version=` ldflag pattern enforced by `wfctl plugin validate-contract`
+// (workflow#758 plugin-version discipline).
+var Version = "dev"
 
 // GCPProvider implements interfaces.IaCProvider for Google Cloud Platform.
 type GCPProvider struct {
@@ -41,7 +44,7 @@ func NewGCPProviderConcrete() *GCPProvider {
 }
 
 func (p *GCPProvider) Name() string    { return providerName }
-func (p *GCPProvider) Version() string { return ProviderVersion }
+func (p *GCPProvider) Version() string { return Version }
 
 func (p *GCPProvider) Initialize(ctx context.Context, config map[string]any) error {
 	pid, ok := config["project_id"].(string)

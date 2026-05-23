@@ -14,14 +14,15 @@ builds:
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
     ldflags:
-      - -s -w -X github.com/GoCodeAlone/workflow-plugin-gcp/provider.ProviderVersion={{.Version}}
+      - -s -w -X github.com/GoCodeAlone/workflow-plugin-gcp/provider.Version={{.Version}}
 
 archives:
   - id: default
     formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
-      - plugin.json
+      - src: .release/plugin.json
+        dst: plugin.json
       - plugin.contracts.json
       - LICENSE
 
