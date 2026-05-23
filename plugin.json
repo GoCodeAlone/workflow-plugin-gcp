@@ -1,12 +1,12 @@
 {
   "name": "workflow-plugin-gcp",
-  "version": "2.0.0",
+  "version": "0.0.0",
   "author": "GoCodeAlone",
   "description": "GCP infrastructure provider plugin for workflow",
   "type": "external",
   "tier": "community",
   "license": "MIT",
-  "minEngineVersion": "0.57.0",
+  "minEngineVersion": "0.61.0",
   "repository": "https://github.com/GoCodeAlone/workflow-plugin-gcp",
   "keywords": [
     "gcp",
