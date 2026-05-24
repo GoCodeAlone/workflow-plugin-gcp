@@ -1,6 +1,10 @@
 package drivers
 
-import "context"
+import (
+	"context"
+
+	"google.golang.org/api/dns/v1"
+)
 
 // CloudRunClient abstracts Cloud Run service operations.
 type CloudRunClient interface {
@@ -58,6 +62,8 @@ type DNSClient interface {
 	GetManagedZone(ctx context.Context, projectID, zoneID string) (map[string]any, error)
 	UpdateManagedZone(ctx context.Context, projectID, zoneID string, config map[string]any) error
 	DeleteManagedZone(ctx context.Context, projectID, zoneID string) error
+	ListResourceRecordSets(ctx context.Context, projectID, zoneID string) ([]*dns.ResourceRecordSet, error)
+	UpsertResourceRecordSet(ctx context.Context, projectID, zoneID string, record *dns.ResourceRecordSet) error
 }
 
 // ArtifactRegistryClient abstracts Artifact Registry operations.
