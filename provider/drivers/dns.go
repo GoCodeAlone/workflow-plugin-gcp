@@ -23,10 +23,12 @@ func (d *DNSDriver) Create(ctx context.Context, spec interfaces.ResourceSpec) (*
 		Type:       spec.Type,
 		ProviderID: id,
 		Status:     "running",
-		Outputs: map[string]any{
+		Outputs: cloudDNSOutputs(map[string]any{
 			"zone_id":      id,
+			"domain":       stringProp(spec.Config, "dns_name"),
+			"dns_name":     stringProp(spec.Config, "dns_name"),
 			"name_servers": []string{"ns-cloud-a1.googledomains.com"},
-		},
+		}),
 	}, nil
 }
 
@@ -40,7 +42,7 @@ func (d *DNSDriver) Read(ctx context.Context, ref interfaces.ResourceRef) (*inte
 		Type:       ref.Type,
 		ProviderID: ref.ProviderID,
 		Status:     "running",
-		Outputs:    info,
+		Outputs:    cloudDNSOutputs(info),
 	}, nil
 }
 
@@ -85,3 +87,44 @@ func (d *DNSDriver) Scale(_ context.Context, _ interfaces.ResourceRef, _ int) (*
 
 // SensitiveKeys returns output keys whose values should be masked in logs and plan output.
 func (d *DNSDriver) SensitiveKeys() []string { return nil }
+
+func cloudDNSOutputs(info map[string]any) map[string]any {
+	outputs := make(map[string]any, len(info)+2)
+	for key, value := range info {
+		outputs[key] = value
+	}
+	if _, ok := outputs["domain"]; !ok {
+		if dnsName, ok := outputs["dns_name"].(string); ok {
+			outputs["domain"] = dnsName
+		}
+	}
+	nameServers := stringSlice(outputs["name_servers"])
+	outputs["authority"] = map[string]any{
+		"role":         "target_authoritative_dns",
+		"dns_host":     "Cloud DNS",
+		"name_servers": nameServers,
+	}
+	return outputs
+}
+
+func stringProp(values map[string]any, key string) string {
+	value, _ := values[key].(string)
+	return value
+}
+
+func stringSlice(value any) []string {
+	switch typed := value.(type) {
+	case []string:
+		return append([]string(nil), typed...)
+	case []any:
+		out := make([]string, 0, len(typed))
+		for _, item := range typed {
+			if text, ok := item.(string); ok {
+				out = append(out, text)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}

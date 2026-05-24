@@ -51,6 +51,13 @@ func TestDNSDriver_Create_Success(t *testing.T) {
 	if out.ProviderID != "zone-123" {
 		t.Errorf("expected zone-123, got %s", out.ProviderID)
 	}
+	authority, ok := out.Outputs["authority"].(map[string]any)
+	if !ok {
+		t.Fatalf("authority = %T, want map[string]any", out.Outputs["authority"])
+	}
+	if got := authority["dns_host"]; got != "Cloud DNS" {
+		t.Fatalf("authority.dns_host = %v, want Cloud DNS", got)
+	}
 }
 
 func TestDNSDriver_Create_Error(t *testing.T) {
@@ -72,6 +79,32 @@ func TestDNSDriver_Update_Success(t *testing.T) {
 	}
 	if out == nil {
 		t.Fatal("expected output")
+	}
+}
+
+func TestDNSDriver_ReadIncludesAuthority(t *testing.T) {
+	d := &DNSDriver{Client: &mockDNSClient{getResult: map[string]any{
+		"name":         "myzone",
+		"dns_name":     "example.com.",
+		"name_servers": []string{"ns-cloud-a1.googledomains.com.", "ns-cloud-a2.googledomains.com."},
+	}}, ProjectID: "p"}
+	out, err := d.Read(context.Background(), interfaces.ResourceRef{Name: "myzone", Type: "infra.dns", ProviderID: "zone-123"})
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if out.Outputs["domain"] != "example.com." {
+		t.Fatalf("domain = %v, want example.com.", out.Outputs["domain"])
+	}
+	authority, ok := out.Outputs["authority"].(map[string]any)
+	if !ok {
+		t.Fatalf("authority = %T, want map[string]any", out.Outputs["authority"])
+	}
+	if got := authority["dns_host"]; got != "Cloud DNS" {
+		t.Fatalf("authority.dns_host = %v, want Cloud DNS", got)
+	}
+	nameServers, ok := authority["name_servers"].([]string)
+	if !ok || len(nameServers) != 2 || nameServers[0] != "ns-cloud-a1.googledomains.com." {
+		t.Fatalf("authority.name_servers = %#v, want Cloud DNS nameservers", authority["name_servers"])
 	}
 }
 
