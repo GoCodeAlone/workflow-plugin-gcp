@@ -2,6 +2,7 @@ package drivers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -19,6 +20,7 @@ import (
 	runpb "cloud.google.com/go/run/apiv2/runpb"
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/dns/v1"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 	sqladmin "google.golang.org/api/sqladmin/v1"
@@ -649,6 +651,31 @@ func (c *realDNSClient) UpdateManagedZone(ctx context.Context, projectID, zoneID
 
 func (c *realDNSClient) DeleteManagedZone(ctx context.Context, projectID, zoneID string) error {
 	return c.svc.ManagedZones.Delete(projectID, zoneID).Context(ctx).Do()
+}
+
+func (c *realDNSClient) ListResourceRecordSets(ctx context.Context, projectID, zoneID string) ([]*dns.ResourceRecordSet, error) {
+	var out []*dns.ResourceRecordSet
+	err := c.svc.ResourceRecordSets.List(projectID, zoneID).Pages(ctx, func(page *dns.ResourceRecordSetsListResponse) error {
+		out = append(out, page.Rrsets...)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *realDNSClient) UpsertResourceRecordSet(ctx context.Context, projectID, zoneID string, record *dns.ResourceRecordSet) error {
+	_, err := c.svc.ResourceRecordSets.Create(projectID, zoneID, record).Context(ctx).Do()
+	if err == nil {
+		return nil
+	}
+	var apiErr *googleapi.Error
+	if !errors.As(err, &apiErr) || apiErr.Code != 409 {
+		return err
+	}
+	_, err = c.svc.ResourceRecordSets.Patch(projectID, zoneID, record.Name, record.Type, record).Context(ctx).Do()
+	return err
 }
 
 // --- Artifact Registry ---
