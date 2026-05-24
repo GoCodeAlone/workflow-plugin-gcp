@@ -17,7 +17,7 @@ const providerName = "gcp"
 // The name `Version` (not `ProviderVersion`) is required to match the
 // `-X *.Version=` ldflag pattern enforced by `wfctl plugin validate-contract`
 // (workflow#758 plugin-version discipline).
-var Version = "dev"
+var Version = "0.0.0"
 
 // GCPProvider implements interfaces.IaCProvider for Google Cloud Platform.
 type GCPProvider struct {
