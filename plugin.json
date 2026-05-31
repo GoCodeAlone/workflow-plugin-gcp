@@ -7,6 +7,14 @@
   "tier": "community",
   "license": "MIT",
   "minEngineVersion": "0.64.3",
+  "required_secrets": [
+    {
+      "name": "GCP_SERVICE_ACCOUNT_JSON",
+      "sensitive": true,
+      "description": "GCP service-account JSON key (inline blob). For the credentials.service_account_json path; ADC / Workload Identity deployments may skip. Referenced as ${GCP_SERVICE_ACCOUNT_JSON}.",
+      "prompt": "GCP service-account JSON"
+    }
+  ],
   "iacServices": [
     "workflow.plugin.external.iac.IaCProviderRequired",
     "workflow.plugin.external.iac.IaCProviderEnumerator",
