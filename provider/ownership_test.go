@@ -78,8 +78,9 @@ func TestSetOwnerUpdatesWorkflowOwnerLabelThroughDriver(t *testing.T) {
 		t.Fatalf("SetOwner: %v", err)
 	}
 
-	if len(driver.updateRefs) != 1 || driver.updateRefs[0] != ref {
-		t.Fatalf("update refs = %#v, want %#v", driver.updateRefs, ref)
+	wantRef := interfaces.ResourceRef{Name: "api", Type: "infra.container_service", ProviderID: "api"}
+	if len(driver.updateRefs) != 1 || driver.updateRefs[0] != wantRef {
+		t.Fatalf("update refs = %#v, want %#v", driver.updateRefs, wantRef)
 	}
 	labels, ok := driver.updateSpecs[0].Config["labels"].(map[string]string)
 	if !ok {
@@ -87,6 +88,22 @@ func TestSetOwnerUpdatesWorkflowOwnerLabelThroughDriver(t *testing.T) {
 	}
 	if labels[ownershipLabelKey] != "workflow" {
 		t.Fatalf("labels[%q] = %q, want workflow", ownershipLabelKey, labels[ownershipLabelKey])
+	}
+}
+
+func TestSetOwnerFallsBackToNameAndStripsProviderPathForDriver(t *testing.T) {
+	driver := &fakeOwnershipDriver{}
+	p := initializedOwnershipProvider(&fakeOwnershipAssetClient{})
+	p.SetDriver("infra.container_service", driver)
+	ref := interfaces.ResourceRef{Name: "//run.googleapis.com/projects/proj/locations/us-central1/services/api", Type: "infra.container_service"}
+
+	if err := p.SetOwner(context.Background(), ref, "workflow"); err != nil {
+		t.Fatalf("SetOwner: %v", err)
+	}
+
+	wantRef := interfaces.ResourceRef{Name: ref.Name, Type: "infra.container_service", ProviderID: "api"}
+	if len(driver.updateRefs) != 1 || driver.updateRefs[0] != wantRef {
+		t.Fatalf("update refs = %#v, want %#v", driver.updateRefs, wantRef)
 	}
 }
 

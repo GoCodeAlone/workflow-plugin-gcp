@@ -118,7 +118,11 @@ func (p *GCPProvider) SetOwner(ctx context.Context, ref interfaces.ResourceRef, 
 	if err != nil {
 		return err
 	}
-	_, err = driver.Update(ctx, ref, interfaces.ResourceSpec{
+	driverRef, err := ownershipDriverRef(ref)
+	if err != nil {
+		return err
+	}
+	_, err = driver.Update(ctx, driverRef, interfaces.ResourceSpec{
 		Name: ref.Name,
 		Type: ref.Type,
 		Config: map[string]any{
@@ -129,6 +133,19 @@ func (p *GCPProvider) SetOwner(ctx context.Context, ref interfaces.ResourceRef, 
 		return fmt.Errorf("gcp: label %s/%s with owner %q: %w", ref.Type, ref.Name, owner, err)
 	}
 	return nil
+}
+
+func ownershipDriverRef(ref interfaces.ResourceRef) (interfaces.ResourceRef, error) {
+	id := strings.TrimSpace(ref.ProviderID)
+	if id == "" {
+		id = strings.TrimSpace(ref.Name)
+	}
+	id = nameFromGCPAssetName(id)
+	if id == "" {
+		return interfaces.ResourceRef{}, fmt.Errorf("gcp: resource %s/%s has no provider ID or name", ref.Type, ref.Name)
+	}
+	ref.ProviderID = id
+	return ref, nil
 }
 
 func (p *GCPProvider) ListOwners(ctx context.Context, filter interfaces.OwnerFilter) ([]interfaces.ResourceOwner, error) {
