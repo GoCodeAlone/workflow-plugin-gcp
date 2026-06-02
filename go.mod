@@ -5,13 +5,14 @@ go 1.26.0
 require (
 	cloud.google.com/go/apigateway v1.7.7
 	cloud.google.com/go/artifactregistry v1.20.0
+	cloud.google.com/go/asset v1.27.0
 	cloud.google.com/go/compute v1.54.0
 	cloud.google.com/go/container v1.46.0
 	cloud.google.com/go/redis v1.18.3
 	cloud.google.com/go/run v1.15.0
 	cloud.google.com/go/storage v1.61.3
-	github.com/GoCodeAlone/workflow v0.68.2
-	google.golang.org/api v0.272.0
+	github.com/GoCodeAlone/workflow v0.69.7
+	google.golang.org/api v0.274.0
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 )
@@ -19,12 +20,15 @@ require (
 require (
 	cel.dev/expr v0.25.1 // indirect
 	cloud.google.com/go v0.123.0 // indirect
+	cloud.google.com/go/accesscontextmanager v1.10.0 // indirect
 	cloud.google.com/go/auth v0.19.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
-	cloud.google.com/go/iam v1.5.3 // indirect
-	cloud.google.com/go/longrunning v0.8.0 // indirect
+	cloud.google.com/go/iam v1.7.0 // indirect
+	cloud.google.com/go/longrunning v0.9.0 // indirect
 	cloud.google.com/go/monitoring v1.24.3 // indirect
+	cloud.google.com/go/orgpolicy v1.16.0 // indirect
+	cloud.google.com/go/osconfig v1.17.0 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/DataDog/datadog-go/v5 v5.8.3 // indirect
 	github.com/GoCodeAlone/go-plugin v1.7.0 // indirect
@@ -102,7 +106,7 @@ require (
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.14 // indirect
-	github.com/googleapis/gax-go/v2 v2.19.0 // indirect
+	github.com/googleapis/gax-go/v2 v2.21.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect

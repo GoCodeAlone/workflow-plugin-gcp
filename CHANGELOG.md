@@ -9,10 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `IaCProviderOwnership` support backed by the GCP `workflow-owner` label for
+  supported label-capable resources: Cloud Run, Cloud SQL, Memorystore,
+  Artifact Registry, and GCS buckets.
 - `README.md` with experimental banner, module type list, install instructions, and authentication notes (2026-05-19 OSS-readiness QoL sweep).
 - `CONTRIBUTING.md` with local development and PR guidelines.
 - `examples/minimal/config.yaml` — minimal `gcp.credentials` + `iac.provider` config validated via `wfctl validate`.
 - `.github/PULL_REQUEST_TEMPLATE.md` and `.github/ISSUE_TEMPLATE/` (bug report + feature request).
+
+### Changed
+
+- Raised `minEngineVersion` to `0.69.1` for the ownership service contract.
 
 ## [2.0.0-rc1] — 2026-05-17
 

@@ -110,5 +110,6 @@ func TestGCPIaCServer_CompileTimeGuards(t *testing.T) {
 	// the build fails before this test even runs.
 	var _ pb.IaCProviderRequiredServer = (*gcpIaCServer)(nil)
 	var _ pb.IaCProviderDriftDetectorServer = (*gcpIaCServer)(nil)
+	var _ pb.IaCProviderOwnershipServer = (*gcpIaCServer)(nil)
 	var _ pb.ResourceDriverServer = (*gcpIaCServer)(nil)
 }

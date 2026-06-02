@@ -92,6 +92,9 @@ func (c *realCloudRunClient) UpdateService(ctx context.Context, projectID, regio
 	if image, ok := config["image"].(string); ok && len(svc.Template.Containers) > 0 {
 		svc.Template.Containers[0].Image = image
 	}
+	if labels := labelsFromConfig(config); len(labels) > 0 {
+		svc.Labels = mergeLabels(svc.Labels, labels)
+	}
 	op, opErr := c.svc.UpdateService(ctx, &runpb.UpdateServiceRequest{Service: svc})
 	if opErr != nil {
 		return opErr
@@ -287,6 +290,17 @@ func (c *realCloudSQLClient) UpdateInstance(ctx context.Context, projectID, inst
 	if tier, ok := config["tier"].(string); ok {
 		inst.Settings.Tier = tier
 	}
+	if labels := labelsFromConfig(config); len(labels) > 0 {
+		current, err := c.svc.Instances.Get(projectID, instanceID).Context(ctx).Do()
+		if err != nil {
+			return err
+		}
+		var currentLabels map[string]string
+		if current.Settings != nil {
+			currentLabels = current.Settings.UserLabels
+		}
+		inst.Settings.UserLabels = mergeLabels(currentLabels, labels)
+	}
 	_, err := c.svc.Instances.Patch(projectID, instanceID, inst).Context(ctx).Do()
 	return err
 }
@@ -364,6 +378,14 @@ func (c *realMemorystoreClient) UpdateInstance(ctx context.Context, projectID, r
 	if gb, ok := config["memory_size_gb"].(int); ok {
 		inst.MemorySizeGb = int32(gb)
 		paths = append(paths, "memory_size_gb")
+	}
+	if labels := labelsFromConfig(config); len(labels) > 0 {
+		current, err := c.svc.GetInstance(ctx, &redispb.GetInstanceRequest{Name: name})
+		if err != nil {
+			return err
+		}
+		inst.Labels = mergeLabels(current.GetLabels(), labels)
+		paths = append(paths, "labels")
 	}
 	req := &redispb.UpdateInstanceRequest{
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: paths},
@@ -734,13 +756,26 @@ func (c *realArtifactRegistryClient) GetRepository(ctx context.Context, projectI
 
 func (c *realArtifactRegistryClient) UpdateRepository(ctx context.Context, projectID, location, repoID string, config map[string]any) error {
 	name := fmt.Sprintf("projects/%s/locations/%s/repositories/%s", projectID, location, repoID)
-	desc, _ := config["description"].(string)
+	var paths []string
+	repo := &artifactregistrypb.Repository{Name: name}
+	if desc, ok := config["description"].(string); ok {
+		repo.Description = desc
+		paths = append(paths, "description")
+	}
+	if labels := labelsFromConfig(config); len(labels) > 0 {
+		current, err := c.svc.GetRepository(ctx, &artifactregistrypb.GetRepositoryRequest{Name: name})
+		if err != nil {
+			return err
+		}
+		repo.Labels = mergeLabels(current.GetLabels(), labels)
+		paths = append(paths, "labels")
+	}
+	if len(paths) == 0 {
+		return nil
+	}
 	req := &artifactregistrypb.UpdateRepositoryRequest{
-		Repository: &artifactregistrypb.Repository{
-			Name:        name,
-			Description: desc,
-		},
-		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"description"}},
+		Repository: repo,
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: paths},
 	}
 	_, err := c.svc.UpdateRepository(ctx, req)
 	return err
@@ -1042,6 +1077,9 @@ func (c *realGCSClient) UpdateBucket(ctx context.Context, bucketID string, confi
 	if sc, ok := config["storage_class"].(string); ok {
 		update.StorageClass = sc
 	}
+	for key, value := range labelsFromConfig(config) {
+		update.SetLabel(key, value)
+	}
 	_, err := c.svc.Bucket(bucketID).Update(ctx, update)
 	return err
 }
@@ -1124,4 +1162,32 @@ func (c *realSSLClient) DeleteCertificate(ctx context.Context, projectID, certID
 		return err
 	}
 	return op.Wait(ctx)
+}
+
+func labelsFromConfig(config map[string]any) map[string]string {
+	switch labels := config["labels"].(type) {
+	case map[string]string:
+		return labels
+	case map[string]any:
+		out := make(map[string]string, len(labels))
+		for key, value := range labels {
+			if s, ok := value.(string); ok {
+				out[key] = s
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func mergeLabels(existing, updates map[string]string) map[string]string {
+	out := make(map[string]string, len(existing)+len(updates))
+	for key, value := range existing {
+		out[key] = value
+	}
+	for key, value := range updates {
+		out[key] = value
+	}
+	return out
 }
