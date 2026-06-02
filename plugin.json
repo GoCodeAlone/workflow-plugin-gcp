@@ -6,7 +6,7 @@
   "type": "external",
   "tier": "community",
   "license": "MIT",
-  "minEngineVersion": "0.68.2",
+  "minEngineVersion": "0.69.1",
   "required_secrets": [
     {
       "name": "GCP_SERVICE_ACCOUNT_JSON",
@@ -25,6 +25,7 @@
     "workflow.plugin.external.iac.IaCProviderDriftConfigDetector",
     "workflow.plugin.external.iac.IaCProviderRequirementMapper",
     "workflow.plugin.external.iac.IaCProviderRegionLister",
+    "workflow.plugin.external.iac.IaCProviderOwnership",
     "workflow.plugin.external.iac.ResourceDriver",
     "workflow.plugin.external.iac.IaCStateBackend"
   ],

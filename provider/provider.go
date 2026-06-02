@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GoCodeAlone/workflow/interfaces"
 	"github.com/GoCodeAlone/workflow-plugin-gcp/provider/drivers"
+	"github.com/GoCodeAlone/workflow/interfaces"
 	"google.golang.org/api/option"
 )
 
@@ -25,6 +25,8 @@ type GCPProvider struct {
 	region    string
 	zone      string
 	drivers   map[string]interfaces.ResourceDriver
+
+	ownershipAssets ownershipAssetClient
 }
 
 // New creates a new uninitialized GCPProvider.
@@ -74,6 +76,9 @@ func (p *GCPProvider) Initialize(ctx context.Context, config map[string]any) err
 		opts = append(opts, option.WithCredentialsFile(credFile))
 	}
 	// If no explicit credentials, the SDK will use Application Default Credentials.
+	if err := p.initializeOwnershipAssets(ctx, opts); err != nil {
+		return err
+	}
 
 	// Attempt to create real SDK clients. Fall back to nil-client drivers
 	// (which fail at call time) if client creation fails.
@@ -350,4 +355,6 @@ func (p *GCPProvider) BootstrapStateBackend(_ context.Context, _ map[string]any)
 	return nil, nil
 }
 
-func (p *GCPProvider) Close() error { return nil }
+func (p *GCPProvider) Close() error {
+	return p.closeOwnershipAssets()
+}
