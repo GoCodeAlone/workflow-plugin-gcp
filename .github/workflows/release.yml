@@ -46,7 +46,7 @@ jobs:
       - name: Publish GitHub release
         if: ${{ success() }}
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: gh release edit "${{ github.ref_name }}" --draft=false --repo "${{ github.repository }}"
 
   notify-workflow-registry:
