@@ -46,6 +46,7 @@ type gcpIaCServer struct {
 	pb.UnimplementedIaCProviderOwnershipServer
 	pb.UnimplementedResourceDriverServer
 	pb.UnimplementedIaCStateBackendServer
+	pb.UnimplementedIaCProviderRunnerServer
 
 	provider *provider.GCPProvider
 
@@ -85,6 +86,7 @@ var (
 	_ pb.IaCProviderRequirementMapperServer = (*gcpIaCServer)(nil)
 	_ pb.IaCProviderRegionListerServer      = (*gcpIaCServer)(nil)
 	_ pb.IaCProviderOwnershipServer         = (*gcpIaCServer)(nil)
+	_ pb.IaCProviderRunnerServer            = (*gcpIaCServer)(nil)
 	// gcpIaCServer also SERVES the typed IaC state-backend contract (gcs
 	// backend). The SDK serve hook auto-registers this via type-assertion at
 	// plugin startup — see cmd/workflow-plugin-gcp/main.go.

@@ -27,6 +27,7 @@ type GCPProvider struct {
 	drivers   map[string]interfaces.ResourceDriver
 
 	ownershipAssets ownershipAssetClient
+	runnerClient    gcpRunnerClient
 }
 
 // New creates a new uninitialized GCPProvider.
@@ -84,6 +85,9 @@ func (p *GCPProvider) Initialize(ctx context.Context, config map[string]any) err
 	// (which fail at call time) if client creation fails.
 	p.registerDrivers()
 	p.tryWireRealClients(ctx, opts)
+	if runner, err := newRealGCPRunnerClient(ctx, opts...); err == nil {
+		p.runnerClient = runner
+	}
 	return nil
 }
 
