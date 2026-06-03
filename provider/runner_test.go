@@ -15,6 +15,7 @@ type fakeGCPRunnerClient struct {
 	jobID        string
 	job          *runpb.Job
 	execution    *runpb.Execution
+	runExecution *runpb.Execution
 	gotExecution string
 }
 
@@ -26,6 +27,9 @@ func (f *fakeGCPRunnerClient) CreateJob(_ context.Context, parent, jobID string,
 }
 
 func (f *fakeGCPRunnerClient) RunJob(_ context.Context, name string) (*runpb.Execution, error) {
+	if f.runExecution != nil {
+		return f.runExecution, nil
+	}
 	return &runpb.Execution{Name: name + "/executions/run-1", RunningCount: 1, TaskCount: 1}, nil
 }
 
@@ -97,6 +101,29 @@ func TestGCPRunnerStatusAndLogs(t *testing.T) {
 	}
 	if !sink.eof {
 		t.Fatal("JobLogs did not send EOF")
+	}
+}
+
+func TestGCPRunnerRunJobRequiresExecutionName(t *testing.T) {
+	client := &fakeGCPRunnerClient{runExecution: &runpb.Execution{}}
+	p := &GCPProvider{projectID: "proj", region: "us-central1", runnerClient: client}
+	_, err := p.RunJob(context.Background(), interfaces.JobSpec{
+		Name:       "job",
+		Image:      "repo/app:latest",
+		RunCommand: "echo ok",
+	})
+	if err == nil || !strings.Contains(err.Error(), "did not return an execution name") {
+		t.Fatalf("RunJob error = %v", err)
+	}
+}
+
+func TestGCPJobNameStartsWithLetterAndCollapsesHyphens(t *testing.T) {
+	name := gcpJobName("123--bad name")
+	if !strings.HasPrefix(name, "job-123-bad-name-") {
+		t.Fatalf("name = %q", name)
+	}
+	if strings.Contains(name, "--") {
+		t.Fatalf("name contains repeated hyphen: %q", name)
 	}
 }
 

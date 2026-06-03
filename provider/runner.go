@@ -108,7 +108,7 @@ func (p *GCPProvider) RunJob(ctx context.Context, spec interfaces.JobSpec) (*int
 		execName = created.GetLatestCreatedExecution().GetName()
 	}
 	if execName == "" {
-		execName = jobName
+		return nil, fmt.Errorf("gcp runner: Cloud Run job %q did not return an execution name", jobName)
 	}
 	return &interfaces.JobHandle{
 		ID:       execName,
@@ -191,13 +191,18 @@ func gcpSecretRef(ref string) (string, string) {
 }
 
 var nonGCPJobName = regexp.MustCompile(`[^a-z0-9-]+`)
+var repeatedGCPHyphen = regexp.MustCompile(`-+`)
 
 func gcpJobName(name string) string {
 	name = strings.ToLower(strings.TrimSpace(name))
 	name = nonGCPJobName.ReplaceAllString(name, "-")
+	name = repeatedGCPHyphen.ReplaceAllString(name, "-")
 	name = strings.Trim(name, "-")
 	if name == "" {
 		name = "provider-ephemeral-job"
+	}
+	if name[0] < 'a' || name[0] > 'z' {
+		name = "job-" + name
 	}
 	suffix := fmt.Sprintf("-%d", time.Now().UnixNano())
 	maxBase := 63 - len(suffix)
