@@ -1,6 +1,6 @@
 module github.com/GoCodeAlone/workflow-plugin-gcp
 
-go 1.26.0
+go 1.26.4
 
 require (
 	cloud.google.com/go/apigateway v1.7.7
