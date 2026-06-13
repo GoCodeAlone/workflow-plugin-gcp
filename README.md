@@ -37,7 +37,7 @@ wfctl plugin install
 
 See `examples/minimal/config.yaml`.
 
-Authentication: Application Default Credentials by default; or set `GOOGLE_APPLICATION_CREDENTIALS` (path to a service account JSON file). Set `GCP_PROJECT` for use in config templates.
+Authentication: Application Default Credentials by default; or set `GOOGLE_APPLICATION_CREDENTIALS` (path to a service account JSON file). Set `GCP_PROJECT` as a non-secret variable for provider operations and config templates. Inline `GCP_SERVICE_ACCOUNT_JSON` remains a secret when used instead of ADC.
 
 ## Documentation
 
