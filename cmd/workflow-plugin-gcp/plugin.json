@@ -15,6 +15,15 @@
       "prompt": "GCP service-account JSON"
     }
   ],
+  "required_config": [
+    {
+      "name": "GCP_PROJECT",
+      "key": "project_id",
+      "sensitive": false,
+      "description": "GCP project ID for provider operations and config templates. Referenced as ${GCP_PROJECT}.",
+      "prompt": "GCP project ID"
+    }
+  ],
   "iacServices": [
     "workflow.plugin.external.iac.IaCProviderRequired",
     "workflow.plugin.external.iac.IaCProviderEnumerator",
@@ -98,10 +107,9 @@
         "provider": "gitlab",
         "scopes": [
           "project",
-          "group",
-          "env"
+          "group"
         ],
-        "description": "Stored as GitLab CI/CD variables when workflows run on GitLab."
+        "description": "Stored as GitLab CI/CD variables when workflows run on GitLab; variables may also be narrowed with GitLab environment_scope."
       },
       {
         "provider": "vault",
@@ -131,5 +139,38 @@
         ],
         "description": "Provided by the local process environment."
       }
-    ]
+    ],
+  "config_targets": [
+    {
+      "provider": "github",
+      "scopes": [
+        "repo",
+        "env",
+        "org"
+      ],
+      "description": "Stored as GitHub Actions variables when workflows run on GitHub."
+    },
+    {
+      "provider": "gitlab",
+      "scopes": [
+        "project",
+        "group"
+      ],
+      "description": "Stored as GitLab CI/CD variables when workflows run on GitLab; variables may also be narrowed with GitLab environment_scope."
+    },
+    {
+      "provider": "file",
+      "scopes": [
+        "directory"
+      ],
+      "description": "Stored in a local dotenv/config file for local workflows."
+    },
+    {
+      "provider": "env",
+      "scopes": [
+        "process"
+      ],
+      "description": "Provided by the local process environment."
+    }
+  ]
 }
